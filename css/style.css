@@ -1,0 +1,30 @@
+/* Full-bleed, no-scroll, touch-friendly canvas game.
+   Safe-area insets keep the HUD clear of notches on phones. */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1626;
+  /* disable text selection / callout / tap highlight for an app-like feel */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  /* prevent the browser from hijacking touches for scroll/zoom/gestures */
+  touch-action: none;
+}
