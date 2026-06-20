@@ -1,10 +1,10 @@
 // =============================================================================
-// spawner.js — decides when a new cat shows up and where, following the
+// spawner.js — decides when a new hungry cat shows up and where, following the
 // difficulty curve in config.js.
 // =============================================================================
 
 import { DIFFICULTY, ZONES } from './config.js';
-import { makeCat, pickRecipe } from './entities/cat.js';
+import { makeCat } from './entities/cat.js';
 
 // Called every frame. Counts down a timer; spawns when it hits zero and there's
 // both room on screen and a free zone.
@@ -27,7 +27,7 @@ export function updateSpawner(state, dt) {
   }
 
   const zone = free[Math.floor(Math.random() * free.length)];
-  state.cats.push(makeCat(state, zone.id, pickRecipe(state)));
+  state.cats.push(makeCat(state, zone.id));
 
   // schedule the next one, with a little randomness so it isn't metronomic
   const base = DIFFICULTY.spawnInterval(state.level);

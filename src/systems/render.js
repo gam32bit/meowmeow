@@ -3,14 +3,14 @@
 // Screen shake + DPR scaling are applied by the caller (main.js).
 // =============================================================================
 
-import { TITLE, SUBTITLE, INGREDIENTS, LIVES } from '../config.js';
+import { TITLE, SUBTITLE, LIVES } from '../config.js';
 import * as art from '../art.js';
 import { catMood } from '../entities/cat.js';
-import { matchRecipe } from '../entities/station.js';
+import { intentIsUseful } from '../entities/grandma.js';
 
 const SKY = '#2a2440';
 const GROUND = '#3b3357';
-const KITCHEN_BG = '#241f33';
+const COUNTER_BG = '#241f33';
 
 export function render(ctx, state, layout) {
   const { w, h } = layout;
@@ -20,15 +20,24 @@ export function render(ctx, state, layout) {
   if (state.phase === 'playing' || state.phase === 'gameover') {
     drawZones(ctx, state, layout);
     drawCats(ctx, state, layout);
+    if (state.grandma) drawGrandma(ctx, state.grandma, layout);
     drawEffects(ctx, state, layout);
-    drawKitchen(ctx, state, layout);
+    drawCounter(ctx, state, layout);
   }
 
-  // red flash when a wrong dish is served
+  // red flash when you tap a cat with the wrong thing in hand
   if (state.wrongFlash > 0) {
     ctx.save();
     ctx.globalAlpha = Math.min(0.4, state.wrongFlash / 600);
     ctx.fillStyle = '#ff3b3b';
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  // bright flash on an explosion
+  if (state.flash > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.55, state.flash / 500);
+    ctx.fillStyle = '#ffd9a0';
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
@@ -39,21 +48,21 @@ export function render(ctx, state, layout) {
 
 // --- background ------------------------------------------------------------
 function drawBackground(ctx, layout) {
-  const { w, h, house, kitchen } = layout;
+  const { w, h, play, counter } = layout;
   // sky / night
-  const g = ctx.createLinearGradient(0, 0, 0, kitchen.y);
+  const g = ctx.createLinearGradient(0, 0, 0, counter.y);
   g.addColorStop(0, SKY);
   g.addColorStop(1, GROUND);
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, kitchen.y);
+  ctx.fillRect(0, 0, w, counter.y);
 
   // a cozy house silhouette in the middle
-  const hx = w / 2, hw = w * 0.62, hy = house.y + house.h * 0.16, hh = house.h * 0.7;
+  const hx = w / 2, hw = w * 0.56, hy = play.y + play.h * 0.14, hh = play.h * 0.66;
   ctx.fillStyle = '#4a4168';
   ctx.fillRect(hx - hw / 2, hy, hw, hh);
   ctx.beginPath(); // roof
   ctx.moveTo(hx - hw / 2 - 10, hy);
-  ctx.lineTo(hx, hy - hh * 0.45);
+  ctx.lineTo(hx, hy - hh * 0.4);
   ctx.lineTo(hx + hw / 2 + 10, hy);
   ctx.closePath();
   ctx.fillStyle = '#5b5080';
@@ -61,17 +70,17 @@ function drawBackground(ctx, layout) {
   // warm windows
   ctx.fillStyle = '#ffd98a';
   for (const fx of [0.3, 0.7]) {
-    ctx.fillRect(hx - hw / 2 + hw * fx - hw * 0.08, hy + hh * 0.25, hw * 0.16, hh * 0.2);
+    ctx.fillRect(hx - hw / 2 + hw * fx - hw * 0.07, hy + hh * 0.2, hw * 0.14, hh * 0.18);
   }
   // door
   ctx.fillStyle = '#3a3252';
-  ctx.fillRect(hx - hw * 0.08, hy + hh * 0.55, hw * 0.16, hh * 0.45);
+  ctx.fillRect(hx - hw * 0.07, hy + hh * 0.5, hw * 0.14, hh * 0.5);
 
-  // kitchen counter band
-  ctx.fillStyle = KITCHEN_BG;
-  ctx.fillRect(kitchen.x, kitchen.y, kitchen.w, kitchen.h);
-  ctx.fillStyle = '#322a45';
-  ctx.fillRect(kitchen.x, kitchen.y, kitchen.w, 6);
+  // counter band at the bottom (the kitchen)
+  ctx.fillStyle = COUNTER_BG;
+  ctx.fillRect(counter.x, counter.y, counter.w, counter.h);
+  ctx.fillStyle = '#3a3050';
+  ctx.fillRect(counter.x, counter.y, counter.w, 6);
 }
 
 // --- HUD -------------------------------------------------------------------
@@ -145,7 +154,7 @@ function drawSpeaker(ctx, cx, cy, r, muted) {
   ctx.restore();
 }
 
-// --- zones (markers only; cats drawn separately) ---------------------------
+// --- zones (ground markers; cats drawn separately) -------------------------
 function drawZones(ctx, state, layout) {
   for (const z of layout.zones) {
     ctx.beginPath();
@@ -155,8 +164,9 @@ function drawZones(ctx, state, layout) {
   }
 }
 
-// --- cats + their order bubbles + patience rings ---------------------------
+// --- cats + their patience rings -------------------------------------------
 function drawCats(ctx, state, layout) {
+  const canServe = state.grandma && intentIsUseful(state.grandma, 'feed');
   for (const cat of state.cats) {
     if (cat.status === 'dead') continue;
     const z = layout.zones.find((zz) => zz.id === cat.zoneId);
@@ -175,12 +185,14 @@ function drawCats(ctx, state, layout) {
     // panic shudder
     if (mood === 'panic') ctx.translate(Math.sin(cat.t * 40) * 2, 0);
     ctx.scale(s, s);
-    art.cat(ctx, z.r * 0.7, { mood, color: cat.coat, t: cat.t });
+    art.cat(ctx, z.r * 0.85, { mood, color: cat.coat, t: cat.t });
     ctx.restore();
 
     if (cat.status === 'waiting') {
       drawPatienceRing(ctx, z, cat);
-      drawOrderBubble(ctx, z, cat);
+      drawHungerBubble(ctx, z, cat);
+      // when Grandma is holding a full bowl, gently highlight who can be served
+      if (canServe) drawTapHint(ctx, z.x, z.y, z.r * 1.5, state.time, '#ffd166');
     }
   }
 }
@@ -189,46 +201,52 @@ function drawPatienceRing(ctx, z, cat) {
   const ratio = Math.max(0, cat.patience / cat.patienceMax);
   const col = ratio > 0.5 ? '#6fe06f' : ratio > 0.22 ? '#ffd166' : '#ff5b5b';
   ctx.save();
-  ctx.lineWidth = z.r * 0.14;
+  ctx.lineWidth = z.r * 0.16;
   ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
-  ctx.arc(z.x, z.y, z.r * 1.1, 0, Math.PI * 2);
+  ctx.arc(z.x, z.y, z.r * 1.15, 0, Math.PI * 2);
   ctx.stroke();
   ctx.strokeStyle = col;
   ctx.beginPath();
-  ctx.arc(z.x, z.y, z.r * 1.1, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2);
+  ctx.arc(z.x, z.y, z.r * 1.15, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
 
-function drawOrderBubble(ctx, z, cat) {
-  const bw = z.r * 2.1, bh = z.r * 1.0;
-  const bx = z.x - bw / 2, by = z.y - z.r * 2.5;
+// A simple speech bubble with a bowl icon — every cat just wants a bowl of food.
+function drawHungerBubble(ctx, z, cat) {
+  const bw = z.r * 1.3, bh = z.r * 1.0;
+  const bx = z.x - bw / 2, by = z.y - z.r * 2.6;
   ctx.save();
   ctx.fillStyle = '#fff';
-  roundRectPath(ctx, bx, by, bw, bh, bh * 0.28);
+  roundRectPath(ctx, bx, by, bw, bh, bh * 0.3);
   ctx.fill();
-  // tail of the speech bubble
-  ctx.beginPath();
-  ctx.moveTo(z.x - bh * 0.18, by + bh);
-  ctx.lineTo(z.x + bh * 0.18, by + bh);
-  ctx.lineTo(z.x, by + bh + bh * 0.3);
+  ctx.beginPath(); // tail
+  ctx.moveTo(z.x - bh * 0.16, by + bh);
+  ctx.lineTo(z.x + bh * 0.16, by + bh);
+  ctx.lineTo(z.x, by + bh + bh * 0.28);
   ctx.closePath();
   ctx.fill();
-
-  // mini dish icon
-  ctx.save();
-  ctx.translate(bx + bh * 0.7, by + bh * 0.5);
-  art.dish(ctx, bh * 0.34, cat.recipe.steps);
+  // a little bowl-of-food icon
+  ctx.translate(z.x, by + bh * 0.5);
+  art.bowl(ctx, bh * 0.42, true);
   ctx.restore();
+}
 
-  // recipe name
-  ctx.fillStyle = '#2b2533';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.font = `bold ${Math.round(bh * 0.32)}px system-ui, sans-serif`;
-  ctx.fillText(cat.recipe.name, bx + bh * 1.25, by + bh * 0.5);
+// --- Grandma ---------------------------------------------------------------
+function drawGrandma(ctx, g, layout) {
+  const walking = !!g.target;
+  const bob = walking ? Math.abs(Math.sin(g.walkPhase)) * layout.grandmaR * 0.12 : 0;
+  ctx.save();
+  ctx.translate(g.x, g.y - bob);
+  art.grandma(ctx, layout.grandmaR, {
+    facing: g.facing,
+    walking,
+    phase: g.walkPhase,
+    hands: g.hands,
+    acting: g.acting > 0,
+  });
   ctx.restore();
 }
 
@@ -241,13 +259,13 @@ function drawEffects(ctx, state, layout) {
     if (e.type === 'explosion') {
       ctx.save();
       ctx.translate(z.x, z.y);
-      art.puff(ctx, z.r * (0.5 + p * 1.3), 1 - p);
+      art.explosion(ctx, z.r * 2.4, p, e.parts);
       ctx.restore();
-      // halo floats up in the second half (dark-humor beat)
-      if (p > 0.35) {
+      // a little halo floats up afterward (the dark-humor beat)
+      if (p > 0.5) {
         ctx.save();
-        ctx.translate(z.x, z.y - z.r * 1.2 - (p - 0.35) * z.r * 3);
-        art.halo(ctx, z.r * 0.5, Math.max(0, 1 - (p - 0.35) / 0.65));
+        ctx.translate(z.x, z.y - z.r * 1.2 - (p - 0.5) * z.r * 4);
+        art.halo(ctx, z.r * 0.55, Math.max(0, 1 - (p - 0.5) / 0.5));
         ctx.restore();
       }
     } else if (e.type === 'hearts') {
@@ -255,74 +273,69 @@ function drawEffects(ctx, state, layout) {
       ctx.globalAlpha = 1 - p;
       for (let i = 0; i < 3; i++) {
         const a = (i - 1) * 0.5;
-        art.heart(ctx, z.x + a * z.r, z.y - z.r - p * z.r * 2.2, z.r * 0.22, '#ff8fae');
+        art.heart(ctx, z.x + a * z.r, z.y - z.r - p * z.r * 2.2, z.r * 0.26, '#ff8fae');
       }
-      // floating score
       ctx.fillStyle = '#fff7c2';
       ctx.textAlign = 'center';
-      ctx.font = `bold ${Math.round(z.r * 0.45)}px system-ui, sans-serif`;
+      ctx.font = `bold ${Math.round(z.r * 0.55)}px system-ui, sans-serif`;
       ctx.fillText(`+${e.points}`, z.x, z.y - z.r * 1.6 - p * z.r * 2);
       ctx.restore();
     }
   }
 }
 
-// --- kitchen: plating slots + station buttons ------------------------------
-function drawKitchen(ctx, state, layout) {
-  // plating slots
-  for (const p of layout.plates) {
-    const active = p.index === state.activeSlot;
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = active ? 'rgba(255,217,138,0.18)' : 'rgba(255,255,255,0.06)';
-    ctx.arc(p.x, p.y, p.r * 1.15, 0, Math.PI * 2);
-    ctx.fill();
-    if (active) {
-      ctx.strokeStyle = '#ffd98a';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-    const plate = state.plates[p.index];
-    if (plate) {
-      ctx.translate(p.x, p.y);
-      art.dish(ctx, p.r, plate.steps);
-      // show recipe name if it matches something
-      const r = matchRecipe(plate.steps);
-      if (r) {
-        ctx.fillStyle = '#fff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.font = `${Math.round(p.r * 0.4)}px system-ui, sans-serif`;
-        ctx.fillText(r.name, 0, p.r * 0.9);
-      }
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `${Math.round(p.r * 0.45)}px system-ui, sans-serif`;
-      ctx.fillText('empty', p.x, p.y);
-    }
-    ctx.restore();
-  }
+// --- counter: the two tappable stacks --------------------------------------
+function drawCounter(ctx, state, layout) {
+  const g = state.grandma;
+  const foodUseful = g && intentIsUseful(g, 'food');
+  const bowlUseful = g && intentIsUseful(g, 'bowl');
 
-  // station buttons
-  for (const s of layout.stations) {
-    ctx.save();
-    roundRectPath(ctx, s.x - s.w / 2, s.y - s.h / 2, s.w, s.h, s.w * 0.18);
-    ctx.fillStyle = s.id === 'trash' ? 'rgba(180,80,90,0.25)' : 'rgba(255,255,255,0.08)';
-    ctx.fill();
-    ctx.translate(s.x, s.y - s.h * 0.08);
-    art.stationIcon(ctx, s.id, s.w * 0.3);
-    ctx.restore();
+  drawStack(ctx, layout.foodStack, 'Cat Food', state.time, foodUseful, (c, w, h) =>
+    art.foodStackArt(c, w, h)
+  );
+  drawStack(ctx, layout.bowlStack, 'Bowls', state.time, bowlUseful, (c, w, h) =>
+    art.bowlStackArt(c, w, h)
+  );
+}
 
-    // label
-    ctx.fillStyle = '#cfc6ee';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.font = `${Math.round(s.h * 0.18)}px system-ui, sans-serif`;
-    const label = s.id === 'bowl' ? 'Bowl' : s.id === 'trash' ? 'Trash' : INGREDIENTS[s.id].label;
-    ctx.fillText(label, s.x, s.y + s.h * 0.5);
+function drawStack(ctx, rect, label, time, useful, drawArt) {
+  // platform
+  ctx.save();
+  roundRectPath(ctx, rect.x - rect.w / 2, rect.y - rect.h / 2, rect.w, rect.h, rect.w * 0.1);
+  ctx.fillStyle = useful ? 'rgba(255,217,138,0.16)' : 'rgba(255,255,255,0.06)';
+  ctx.fill();
+  if (useful) {
+    ctx.strokeStyle = '#ffd98a';
+    ctx.lineWidth = 2 + Math.sin(time * 5) + 1.5;
+    ctx.stroke();
   }
+  ctx.restore();
+
+  // the stacked items
+  ctx.save();
+  ctx.translate(rect.x, rect.y);
+  drawArt(ctx, rect.w * 0.7, rect.h * 0.7);
+  ctx.restore();
+
+  // label
+  ctx.fillStyle = '#e9e2ff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${Math.round(rect.h * 0.16)}px system-ui, sans-serif`;
+  ctx.fillText(label, rect.x, rect.y + rect.h * 0.52);
+}
+
+// A soft pulsing ring used to point the player at what to tap next.
+function drawTapHint(ctx, x, y, r, time, color) {
+  const pulse = 0.5 + 0.5 * Math.sin(time * 5);
+  ctx.save();
+  ctx.globalAlpha = 0.25 + pulse * 0.4;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = r * 0.08;
+  ctx.beginPath();
+  ctx.arc(x, y, r * (1 + pulse * 0.08), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 // --- overlays --------------------------------------------------------------
@@ -331,10 +344,10 @@ function drawStartScreen(ctx, state, layout) {
   dim(ctx, w, h, 0.55);
   ctx.textAlign = 'center';
 
-  // a big friendly cat
+  // Grandma waving hello
   ctx.save();
-  ctx.translate(w / 2, h * 0.3);
-  art.cat(ctx, Math.min(w, h) * 0.12, { mood: 'calm', color: '#9b8bb4', t: state.time });
+  ctx.translate(w / 2, h * 0.28);
+  art.grandma(ctx, Math.min(w, h) * 0.1, { facing: 1, hands: 'fullbowl' });
   ctx.restore();
 
   ctx.fillStyle = '#fff';
@@ -345,19 +358,20 @@ function drawStartScreen(ctx, state, layout) {
   ctx.fillText(SUBTITLE, w / 2, h * 0.53);
 
   ctx.fillStyle = '#cfc6ee';
-  ctx.font = `${Math.round(Math.min(w, h) * 0.035)}px system-ui, sans-serif`;
+  ctx.font = `${Math.round(Math.min(w, h) * 0.033)}px system-ui, sans-serif`;
   const lines = [
-    'Tap a Bowl, then ingredients, to cook.',
-    'Tap a cat to serve its order in time.',
-    "Don't let hungry cats go BOOM! 💥",
+    'Tap Cat Food, then Bowls (either order)',
+    'to make a bowl. Grandma walks to fetch each.',
+    'Then tap a hungry cat to feed it in time —',
+    "don't let one go BOOM! 💥",
   ];
-  lines.forEach((t, i) => ctx.fillText(t, w / 2, h * 0.62 + i * Math.min(w, h) * 0.05));
+  lines.forEach((t, i) => ctx.fillText(t, w / 2, h * 0.61 + i * Math.min(w, h) * 0.045));
 
   if (state.highScore > 0) {
     ctx.fillStyle = '#fff7c2';
-    ctx.fillText(`Best: ${state.highScore}`, w / 2, h * 0.8);
+    ctx.fillText(`Best: ${state.highScore}`, w / 2, h * 0.82);
   }
-  pulseText(ctx, 'TAP TO START', w / 2, h * 0.88, Math.min(w, h) * 0.05, state.time);
+  pulseText(ctx, 'TAP TO START', w / 2, h * 0.9, Math.min(w, h) * 0.05, state.time);
 }
 
 function drawGameOver(ctx, state, layout) {

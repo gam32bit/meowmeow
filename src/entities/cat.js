@@ -1,23 +1,21 @@
 // =============================================================================
-// cat.js — the Cat entity: an order, a patience timer, and a little mood
-// state machine. Cats are created by the spawner; this file owns their update,
-// their feeding payoff, and their (comedic) demise.
+// cat.js — the Cat entity: a hungry little guy with a patience timer and a
+// mood. Cats are created by the spawner; this file owns their update, their
+// feeding payoff (delivered by Grandma), and their (comedic) demise.
 // =============================================================================
 
-import { DIFFICULTY, SCORE, FEEL, RECIPES, LEVEL_UP_EVERY } from '../config.js';
-import { matchRecipe } from './station.js';
+import { DIFFICULTY, SCORE, FEEL, LEVEL_UP_EVERY } from '../config.js';
 
 let nextId = 1;
 
 // Soft pastel coats so each cat reads as its own little guy.
 const COATS = ['#9b8bb4', '#e0a96d', '#7fae8e', '#c98b9b', '#8badcf', '#b0a48f'];
 
-export function makeCat(state, zoneId, recipe) {
+export function makeCat(state, zoneId) {
   const patience = DIFFICULTY.patience(state.level);
   return {
     id: nextId++,
     zoneId,
-    recipe,
     patienceMax: patience,
     patience,
     coat: COATS[(nextId * 3) % COATS.length],
@@ -60,46 +58,30 @@ function explode(cat, state, hooks) {
   state.lives -= 1;
   state.combo = 0;
   state.shake = FEEL.explosionShake;
+  state.flash = FEEL.explosionFlashMs;
   hooks.spawnExplosion(cat.zoneId);
   hooks.playExplosion();
   if (state.lives <= 0) hooks.gameOver();
 }
 
-// Try to serve the active plate to this cat. Returns true on a correct feed.
-export function tryFeed(cat, state, hooks) {
+// Grandma delivered a full bowl to this cat. Returns true on a correct feed.
+export function feedCat(cat, state, hooks) {
   if (cat.status !== 'waiting') return false;
-  const plate = state.plates[state.activeSlot];
-  const recipe = plate && matchRecipe(plate.steps);
-  if (!recipe || recipe.id !== cat.recipe.id) {
-    // wrong / empty dish — feedback, but don't punish lives
-    state.wrongFlash = FEEL.wrongFlashMs;
-    hooks.playWrong();
-    return false;
-  }
 
-  // Correct! Score with complexity + speed + combo.
+  // Score with a speed bonus (more patience left = more points) + combo.
   const ratio = Math.max(0, cat.patience / cat.patienceMax);
   const speedBonus = Math.round(SCORE.speedBonusMax * ratio);
-  const complexity = SCORE.perStep * recipe.steps.length;
   const mult = Math.min(SCORE.comboMax, 1 + state.combo * SCORE.comboStep);
-  const gained = Math.round((SCORE.base + complexity + speedBonus) * mult);
+  const gained = Math.round((SCORE.base + speedBonus) * mult);
 
   state.score += gained;
   state.combo += 1;
   state.catsFed += 1;
   state.level = Math.floor(state.catsFed / LEVEL_UP_EVERY);
-  state.plates[state.activeSlot] = null;
 
   cat.status = 'leaving';
   cat.leaveTimer = 0;
   hooks.spawnHearts(cat.zoneId, gained);
   hooks.playSuccess();
   return true;
-}
-
-// Pick a recipe allowed at the current level (within max tier).
-export function pickRecipe(state) {
-  const maxTier = DIFFICULTY.maxTier(state.level);
-  const pool = RECIPES.filter((r) => r.tier <= maxTier);
-  return pool[Math.floor(Math.random() * pool.length)];
 }

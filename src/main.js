@@ -10,6 +10,7 @@ import { render } from './systems/render.js';
 import { handleTap } from './systems/input.js';
 import { updateSpawner } from './spawner.js';
 import { updateCat } from './entities/cat.js';
+import { makeGrandma, updateGrandma, clampGrandma } from './entities/grandma.js';
 import { submitScore } from './systems/storage.js';
 import * as audio from './systems/audio.js';
 
@@ -30,6 +31,7 @@ function resize() {
   canvas.style.height = h + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   layout = computeLayout(w, h);
+  if (state.grandma) clampGrandma(state.grandma, layout);
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
@@ -38,7 +40,16 @@ resize();
 // --- hooks: how entities reach audio + effects + game-over -----------------
 const hooks = {
   spawnExplosion(zoneId) {
-    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.65 });
+    // pre-generate flying debris so each blast is unique
+    const parts = [];
+    for (let i = 0; i < 16; i++) {
+      parts.push({
+        a: Math.random() * Math.PI * 2,
+        sp: 0.6 + Math.random() * 1.7,
+        kind: Math.random() < 0.5 ? 'spark' : 'fur',
+      });
+    }
+    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.95, parts });
   },
   spawnHearts(zoneId, points) {
     state.effects.push({ type: 'hearts', zoneId, points, t: 0, life: 1.0 });
@@ -46,6 +57,8 @@ const hooks = {
   playExplosion: () => audio.playExplosion(),
   playSuccess: () => audio.playSuccess(),
   playWrong: () => audio.playWrong(),
+  playCan: () => audio.playCan(),
+  playScoop: () => audio.playScoop(),
   gameOver() {
     state.phase = 'gameover';
     state.newHighScore = submitScore(state.score);
@@ -80,12 +93,17 @@ function update(dt) {
   // decay feedback timers
   if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 60);
   if (state.wrongFlash > 0) state.wrongFlash = Math.max(0, state.wrongFlash - dt * 1000);
+  if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 1000);
 
   // advance effects, drop finished ones
   for (const e of state.effects) e.t += dt;
   state.effects = state.effects.filter((e) => e.t < e.life);
 
   if (state.phase !== 'playing') return;
+
+  // make sure Grandma exists now that a run is underway
+  if (!state.grandma) state.grandma = makeGrandma(layout.home);
+  updateGrandma(state.grandma, dt, state, layout, hooks);
 
   updateSpawner(state, dt);
 

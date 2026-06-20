@@ -3,7 +3,7 @@
 // serves cache-first, falling back to the network. Bump CACHE when files change.
 // =============================================================================
 
-const CACHE = 'meowmeow-v1';
+const CACHE = 'meowmeow-v2';
 
 const ASSETS = [
   './',
@@ -16,7 +16,7 @@ const ASSETS = [
   './src/art.js',
   './src/spawner.js',
   './src/entities/cat.js',
-  './src/entities/station.js',
+  './src/entities/grandma.js',
   './src/systems/render.js',
   './src/systems/input.js',
   './src/systems/audio.js',

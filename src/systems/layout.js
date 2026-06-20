@@ -4,60 +4,53 @@
 // and hit-testing never drift apart. Pure function of (w, h).
 // =============================================================================
 
-import { ZONES, STATIONS, PLATING_SLOTS } from '../config.js';
+import { ZONES } from '../config.js';
 
 export function computeLayout(w, h) {
-  const hudH = Math.max(54, h * 0.09);
-  const kitchenH = Math.max(180, h * 0.34);
-  const houseTop = hudH;
-  const houseH = h - hudH - kitchenH;
+  const hudH = Math.max(54, h * 0.085);
+  const counterH = Math.max(116, h * 0.19);
+  const playTop = hudH;
+  const playH = h - hudH - counterH;
 
   // HUD: mute button sits top-right.
   const muteR = hudH * 0.32;
   const muteBtn = { x: w - muteR - 14, y: hudH / 2, r: muteR };
 
-  // House: place each zone by its fractional position.
-  const zoneR = Math.min(w, houseH) * 0.13;
+  // House: place each cat zone by its fractional position. Sprites are kept
+  // small so Grandma has plenty of room to roam.
+  const zoneR = Math.min(w, playH) * 0.075;
   const zones = ZONES.map((z) => ({
     id: z.id,
     label: z.label,
     x: z.fx * w,
-    y: houseTop + z.fy * houseH,
+    y: playTop + z.fy * playH,
     r: zoneR,
   }));
 
-  // Kitchen: plating slots on top sub-row, stations below.
-  const kitchenTop = houseTop + houseH;
-  const plateRowY = kitchenTop + kitchenH * 0.26;
-  const plateR = kitchenH * 0.16;
-  const plateGap = plateR * 2.6;
-  const plates = [];
-  const startX = w / 2 - ((PLATING_SLOTS - 1) * plateGap) / 2;
-  for (let i = 0; i < PLATING_SLOTS; i++) {
-    plates.push({ index: i, x: startX + i * plateGap, y: plateRowY, r: plateR });
-  }
+  // Counter band at the bottom: the cat-food stack (left) and bowl stack
+  // (right). Grandma walks down here to assemble a bowl.
+  const counterTop = playTop + playH;
+  const stackW = Math.min(w * 0.3, counterH * 1.15);
+  const stackH = counterH * 0.72;
+  const stackY = counterTop + counterH * 0.52;
+  const foodStack = { id: 'food', x: w * 0.24, y: stackY, w: stackW, h: stackH };
+  const bowlStack = { id: 'bowl', x: w * 0.76, y: stackY, w: stackW, h: stackH };
 
-  // Station buttons: evenly spaced row.
-  const n = STATIONS.length;
-  const pad = w * 0.02;
-  const cellW = (w - pad * 2) / n;
-  const btnSize = Math.min(cellW * 0.86, kitchenH * 0.34);
-  const stationY = kitchenTop + kitchenH * 0.72;
-  const stations = STATIONS.map((id, i) => ({
-    id,
-    x: pad + cellW * (i + 0.5),
-    y: stationY,
-    w: btnSize,
-    h: btnSize,
-    r: btnSize / 2,
-  }));
+  // Where Grandma starts / idles: lower-middle of the play area.
+  const home = { x: w * 0.5, y: playTop + playH * 0.86 };
+
+  // How big to draw Grandma (a touch larger than a cat so she reads as the
+  // star of the show).
+  const grandmaR = zoneR * 1.15;
 
   return {
     w, h, hudH, muteBtn,
-    house: { x: 0, y: houseTop, w, h: houseH },
+    play: { x: 0, y: playTop, w, h: playH },
+    counter: { x: 0, y: counterTop, w, h: counterH },
     zones,
-    kitchen: { x: 0, y: kitchenTop, w, h: kitchenH },
-    plates,
-    stations,
+    foodStack,
+    bowlStack,
+    home,
+    grandmaR,
   };
 }

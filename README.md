@@ -1,20 +1,27 @@
-# Meow Meow — Stray Cat Kitchen 🐱
+# Meow Meow — Grandma's Cat Kitchen 🐱
 
-A cozy-but-chaotic cooking arcade game. Stray cats show up around the house,
-each wanting a dish. Cook it, serve it in time — or the hungry little gremlin
-**explodes** 💥 (a small halo floats up; they're in a better place now). It's a
-mobile-first, tap-to-play web game that gets faster and harder the longer you
-survive. Feed cats, build combos, chase the high score.
+A cozy-but-chaotic arcade game. Stray cats show up around the house, each one
+hungry. **Grandma** — small, brown hair, glasses, and a comfy cardigan — bustles
+across the kitchen to fix each one a bowl of food and carry it over. Feed them in
+time, or the hungry little gremlin **explodes** 💥 (a small halo floats up;
+they're in a better place now). It's a mobile-first, tap-to-play web game that
+gets faster and harder the longer you survive. The catch: Grandma is in no hurry,
+so her walking time is the whole challenge.
 
 Built as a birthday gift. 🎂
 
 ## Play
 
-- **Tap a Bowl** to start a dish, then **tap ingredients** to fill it.
-- Watch each cat's order bubble and the ring around it (its patience).
-- When a plate matches a cat's order, **tap that cat** to serve it.
-- Use the **two plating slots** to pre-make dishes — tap a slot to make it active.
-- Tap **Trash** to dump a wrong dish. Don't let three cats explode!
+It's just three taps:
+
+1. **Tap the Cat Food** stack — Grandma walks over and pops open a can.
+2. **Tap the Bowls** stack — she grabs a bowl. (Either order works: bowl first or
+   food first, you still end up with a full bowl of cat food.)
+3. **Tap a hungry cat** — she carries the bowl over and feeds it.
+
+Watch the ring around each cat (its patience). Feed faster for a bigger speed
+bonus, chain feeds for a combo multiplier — and don't let three cats go BOOM!
+The pulsing highlight always points at what's useful to tap next.
 
 Everything is drawn with code (no image assets) and all sound is synthesized,
 so the whole game is tiny and works offline.
@@ -49,13 +56,14 @@ A workflow at `.github/workflows/pages.yml` deploys the site automatically.
 
 Almost everything lives in [`src/config.js`](src/config.js):
 
-- `TITLE` / `SUBTITLE` — e.g. set `TITLE = "Mom's Stray Cat Kitchen"`.
+- `TITLE` / `SUBTITLE` — e.g. set `TITLE = "Mom's Cat Kitchen"`.
 - `LIVES` — how many explosions you can survive (default 3).
-- `PLATING_SLOTS` — how many dishes you can juggle at once (default 2).
-- `RECIPES` / `INGREDIENTS` — add or change dishes and what goes in them.
-- `DIFFICULTY` — the spawn rate, patience, max cats, and recipe unlocks per
-  level. Lower the numbers to make it gentler, raise them to make it brutal.
+- `GRANDMA` — how fast she walks (`speedFrac`) and how long each action takes
+  (`actionTime`). Slower walking = harder; this is the main difficulty dial.
+- `DIFFICULTY` — the spawn rate, patience, and max cats per level. Lower the
+  numbers to make it gentler, raise them to make it brutal.
 - `SCORE` — points, combo multiplier, speed bonus.
+- `FEEL` — explosion screen-shake and flash intensity.
 
 ## Regenerate the app icons
 
@@ -77,14 +85,14 @@ src/
   config.js             ALL balance + personalization
   state.js              the game world + run reset
   spawner.js            cat spawning + difficulty ramp
-  art.js                custom vector art (cats, dishes, icons, explosions)
+  art.js                custom vector art (cats, Grandma, cans, bowls, explosions)
   entities/
-    cat.js              cat order/patience/feed/explosion
-    station.js          cooking actions + recipe matching
+    cat.js              cat patience / feed payoff / explosion
+    grandma.js          the avatar: walking + carry/assemble/feed state machine
   systems/
     layout.js           responsive pixel layout (shared by render + input)
     render.js           draws the whole scene
-    input.js            tap → action hit-testing
+    input.js            tap → Grandma command hit-testing
     audio.js            WebAudio SFX (synthesized)
     storage.js          high-score persistence
 tools/make-icons.mjs    dependency-free PNG icon generator

@@ -66,32 +66,50 @@ export function playWrong() {
   tone(220, 160, 'square', 0.12, 0.18);
 }
 
-// Explosion: filtered noise burst + a low thump.
+// Explosion: a big, dramatic KABOOM — a sharp noise crack, a long rumbling
+// tail, and a deep sub thump. Loud and chaotic, Exploding-Kittens style.
 export function playExplosion() {
   if (!ctx || muted) return;
   const t0 = ctx.currentTime;
-  const dur = 0.5;
+  const dur = 0.85;
+
+  // full-band noise burst that decays into a low rumble
   const buffer = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) {
-    data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const k = 1 - i / data.length;
+    data[i] = (Math.random() * 2 - 1) * k * k;
   }
   const noise = ctx.createBufferSource();
   noise.buffer = buffer;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(1800, t0);
-  filter.frequency.exponentialRampToValueAtTime(200, t0 + dur);
+  filter.frequency.setValueAtTime(4200, t0);
+  filter.frequency.exponentialRampToValueAtTime(120, t0 + dur);
   const g = ctx.createGain();
-  g.gain.setValueAtTime(0.5, t0);
+  g.gain.setValueAtTime(0.9, t0);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   noise.connect(filter).connect(g).connect(ctx.destination);
   noise.start(t0);
-  // low thump under it
-  tone(120, 40, 'sine', 0.3, 0.35);
+
+  // deep sub-bass thump + a quick descending "whump" on top
+  tone(160, 32, 'sine', 0.6, 0.55);
+  tone(90, 28, 'triangle', 0.4, 0.45);
 }
 
-// Soft tick for UI taps (cooking actions).
+// Soft tick for UI taps (issuing a command / selecting a target).
 export function playTap() {
   tone(660, 660, 'sine', 0.06, 0.06);
+}
+
+// Opening a can of cat food: a short metallic "tk-pop".
+export function playCan() {
+  tone(900, 1500, 'square', 0.07, 0.05);
+  setTimeout(() => tone(400, 260, 'triangle', 0.08, 0.1), 50);
+}
+
+// Scooping food into / grabbing a bowl: a soft ceramic clink.
+export function playScoop() {
+  tone(520, 520, 'triangle', 0.09, 0.09);
+  setTimeout(() => tone(740, 700, 'sine', 0.07, 0.1), 60);
 }

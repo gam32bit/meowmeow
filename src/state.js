@@ -2,7 +2,7 @@
 // state.js — the whole mutable game world in one object + helpers to reset it.
 // =============================================================================
 
-import { LIVES, PLATING_SLOTS } from './config.js';
+import { LIVES } from './config.js';
 import { getHighScore } from './systems/storage.js';
 
 // phase: 'start' | 'playing' | 'gameover'
@@ -21,12 +21,12 @@ export function createState() {
     spawnTimer: 0,       // counts down to next spawn
 
     cats: [],            // active Cat instances
-    plates: new Array(PLATING_SLOTS).fill(null), // each: { steps: [...] } | null
-    activeSlot: 0,       // which plate the next ingredient lands on
-    effects: [],         // transient visual effects (explosions, hearts, halos)
+    grandma: null,       // the player's avatar; created lazily once layout exists
+    effects: [],         // transient visual effects (explosions, hearts)
 
     shake: 0,            // current screen-shake magnitude
-    wrongFlash: 0,       // ms remaining of red "wrong dish" flash
+    flash: 0,            // ms remaining of the explosion full-screen flash
+    wrongFlash: 0,       // ms remaining of the red "need food" flash
     muted: false,
   };
 }
