@@ -103,17 +103,18 @@ const GMA = [
   '.HGGGGSGGGGH.', //  8 glasses: bottom rims
   '.HSSSSSSSSSH.', //  9 cheeks
   '.HSSSMMMSSSH.', // 10 little smile
-  '..SSSSSSSSS..', // 11 chin
-  '...SSSSSSS...', // 12 jaw
-  '....SSSSS....', // 13 neck
-  '..cCCCCCCCc..', // 14 cardigan collar
-  '.cCCCCWCCCCc.', // 15 cardigan + button
-  '.cCCCCWCCCCc.', // 16 cardigan + button
-  '.cCCCCWCCCCc.', // 17 cardigan + button
-  '..CCCCCCCCC..', // 18 hem
-  '..KKKKKKKKK..', // 19 skirt
-  '..KKKKKKKKK..', // 20 skirt
-  '...FF...FF...', // 21 shoes
+  '.HSSSSSSSSSH.', // 11 chin (longer hair continues down)
+  '..HSSSSSSSH..', // 12 jaw (hair alongside)
+  '...HSSSSSH...', // 13 neck (hair alongside)
+  '.HH.......HH.', // 14 hair hanging past shoulder
+  '...cCCCCCc...', // 15 cardigan collar (slimmer)
+  '..cCCCWCCCc..', // 16 cardigan + button (slimmer)
+  '..cCCCWCCCc..', // 17 cardigan + button (slimmer)
+  '..cCCCWCCCc..', // 18 cardigan + button (slimmer)
+  '...CCCCCCC...', // 19 hem (slimmer)
+  '...KKKKKKK...', // 20 skirt (slimmer)
+  '...KKKKKKK...', // 21 skirt (slimmer)
+  '...FF...FF...', // 22 shoes
 ];
 const GMA_PAL = {
   H: '#4d3422', // dark brown hair
