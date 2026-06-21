@@ -92,21 +92,21 @@ export function cat(ctx, r, opts = {}) {
 // `walking` adds a 1px waddle bob; `facing` flips her left/right. Body is kept
 // armless-blocky so the bowl/can she cradles in front always reads cleanly.
 const GMA = [
-  '.....HHH.....', //  0 hair top
-  '...HHHHHHH...', //  1 hair
-  '..HHHhhhHHH..', //  2 hair + highlight
-  '..HHhhhhhHH..', //  3 hair + highlight
-  '.HHHHHHHHHHH.', //  4 hair frames the face
-  '.HHSSSSSSSHH.', //  5 forehead
-  '.HSSSSSSSSSH.', //  6 face
-  '.HSGGGSGGGSH.', //  7 round lens rims
-  '.HSgggSgggSH.', //  8 bright lenses + nose bridge
+  '...HHHHHHH...', //  0 hair crown (dark, full)
+  '.HHHHHHHHHHH.', //  1 hair
+  '.HHHHhhhHHHH.', //  2 hair + soft highlight
+  '.HHHHHHHHHHH.', //  3 hair
+  '.HHSSSSSSSHH.', //  4 forehead (hair frames the face)
+  '.HGGGGSGGGGH.', //  5 glasses: top rims, nose gap
+  '.HGggGGGggGH.', //  6 lenses + bridge bar
+  '.HGggGSGggGH.', //  7 lenses, nose shows through
+  '.HGGGGSGGGGH.', //  8 glasses: bottom rims
   '.HSSSSSSSSSH.', //  9 cheeks
-  '..SSSMMMSSS..', // 10 little smile
-  '...SSSSSSS...', // 11 chin
-  '....SSSSS....', // 12 neck
-  '..cCCCCCCCc..', // 13 cardigan collar
-  '.cCCCCWCCCCc.', // 14 cardigan + button
+  '.HSSSMMMSSSH.', // 10 little smile
+  '..SSSSSSSSS..', // 11 chin
+  '...SSSSSSS...', // 12 jaw
+  '....SSSSS....', // 13 neck
+  '..cCCCCCCCc..', // 14 cardigan collar
   '.cCCCCWCCCCc.', // 15 cardigan + button
   '.cCCCCWCCCCc.', // 16 cardigan + button
   '.cCCCCWCCCCc.', // 17 cardigan + button
@@ -116,11 +116,11 @@ const GMA = [
   '...FF...FF...', // 21 shoes
 ];
 const GMA_PAL = {
-  H: '#7a5230', // brown hair
-  h: '#9a6a3d', // hair highlight
+  H: '#4d3422', // dark brown hair
+  h: '#6b4a30', // warm hair highlight
   S: '#e8b98f', // skin
-  G: '#403a4a', // glasses frame
-  g: '#cfe8f5', // glasses lens shine
+  G: '#23202b', // glasses frame (bold near-black so it reads at any size)
+  g: '#dff2fb', // bright glasses lens
   M: '#bd6f66', // little smile
   C: '#d98fb0', // cardigan
   c: '#b06a8a', // cardigan shading / collar

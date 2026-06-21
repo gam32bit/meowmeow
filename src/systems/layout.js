@@ -62,7 +62,7 @@ export function computeLayout(w, h) {
 
   return {
     w, h, hudH, muteBtn,
-    play, groundY, house,
+    play, groundY, house, zoneR,
     zones, foodStack, bowlStack, home, grandmaR,
   };
 }

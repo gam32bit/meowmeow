@@ -49,9 +49,10 @@ export const DIFFICULTY = {
   patience(level) {
     return Math.max(7, 14 - level * 1.0);
   },
-  // Max cats on screen at once — fills the yard sooner.
+  // Max cats on screen at once. Climbs by one every level so the yard fills up
+  // fast: 1 cat at the start, then 2, 3, and all 4 zones swarming by level 3.
   maxCats(level) {
-    return Math.min(ZONES.length, 1 + Math.floor(level / 1.3));
+    return Math.min(ZONES.length, level + 1);
   },
 };
 
@@ -71,4 +72,19 @@ export const FEEL = {
   explosionShake: 14,       // screen shake magnitude on explosion (px)
   explosionFlashMs: 130,    // full-screen flash on explosion (ms)
   wrongFlashMs: 400,        // how long the local red "✗" shows on a mis-tap (ms)
+};
+
+// --- Explosions grow over a run --------------------------------------------
+// Each blast in a single run is bigger than the last: the first is a contained
+// pop, the final one (when the last life is lost) nearly fills the screen. The
+// returned value is the radius (px) handed to the explosion art, sized relative
+// to the screen diagonal so it scales across phones and desktops.
+export const EXPLOSION = {
+  smallFrac: 0.11,  // first blast radius as a fraction of the screen diagonal
+  hugeFrac: 0.36,   // last blast radius as a fraction of the screen diagonal
+  // n is 1-based (1..total); diag = hypot(screenW, screenH).
+  radius(n, total, diag) {
+    const frac = total > 1 ? Math.max(0, Math.min(1, (n - 1) / (total - 1))) : 1;
+    return diag * (this.smallFrac + (this.hugeFrac - this.smallFrac) * frac);
+  },
 };

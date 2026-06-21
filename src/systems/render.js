@@ -29,6 +29,7 @@ export function render(ctx, state, layout) {
     drawStations(ctx, state, layout);
     drawCats(ctx, state, layout);
     if (state.grandma) drawGrandma(ctx, state.grandma, layout);
+    drawStationLabels(ctx, layout); // on top so Grandma never hides them
     drawEffects(ctx, state, layout);
     drawHints(ctx, state, layout);
   }
@@ -146,6 +147,46 @@ function drawStations(ctx, state, layout) {
   drawStack(ctx, layout.bowlStack, (c, w, h) => art.bowlStackArt(c, w, h));
 }
 
+// Captions under the two stations so it's clear what to tap. Drawn on TOP of the
+// scene (after Grandma) and sat just below each stack on the floor. The stacks
+// are close together, so both labels share one size that keeps the wider caption
+// inside the stack spacing — they never collide on a narrow phone.
+function drawStationLabels(ctx, layout) {
+  const maxW = layout.house.w * 0.36; // stacks are ~0.4*houseW apart; stay inside that
+  let fs = Math.max(11, Math.round(layout.zoneR * 0.72));
+  ctx.font = `bold ${fs}px system-ui, sans-serif`;
+  while (fs > 9 && ctx.measureText('Cat Food').width > maxW) {
+    fs -= 1;
+    ctx.font = `bold ${fs}px system-ui, sans-serif`;
+  }
+  drawStationLabel(ctx, layout.foodStack, 'Cat Food', fs);
+  drawStationLabel(ctx, layout.bowlStack, 'Bowls', fs);
+}
+
+function drawStationLabel(ctx, rect, text, fs) {
+  const cx = rect.x;
+  const cy = rect.y + rect.h / 2 + Math.round(fs * 0.95); // just below the stack
+  ctx.save();
+  ctx.font = `bold ${fs}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(text).width;
+  const bw = tw + fs * 0.9;
+  const bh = fs + fs * 0.55;
+  // dark pill so the caption reads against grass, floor, or a fed cat's heart
+  ctx.fillStyle = 'rgba(38,26,18,0.8)';
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, bh / 2);
+    ctx.fill();
+  } else {
+    ctx.fillRect(cx - bw / 2, cy - bh / 2, bw, bh);
+  }
+  ctx.fillStyle = '#fff3e0';
+  ctx.fillText(text, cx, cy + 1);
+  ctx.restore();
+}
+
 function drawStack(ctx, rect, drawFn) {
   ctx.save();
   ctx.translate(rect.x, rect.y);
@@ -252,7 +293,9 @@ function drawEffects(ctx, state, layout) {
     if (e.type === 'explosion') {
       ctx.save();
       ctx.translate(z.x, cy);
-      art.explosion(ctx, z.r * 3.2, p, e.parts);
+      // mag grows with each blast in a run (set in main.js); fall back to the
+      // old contained size if an effect somehow lacks one.
+      art.explosion(ctx, e.mag || z.r * 3.2, p, e.parts);
       ctx.restore();
       if (p > 0.45) {
         ctx.save();

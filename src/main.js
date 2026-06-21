@@ -12,6 +12,7 @@ import { updateSpawner } from './spawner.js';
 import { updateCat } from './entities/cat.js';
 import { makeGrandma, updateGrandma, clampGrandma } from './entities/grandma.js';
 import { submitScore } from './systems/storage.js';
+import { LIVES, EXPLOSION } from './config.js';
 import * as audio from './systems/audio.js';
 
 const canvas = document.getElementById('game');
@@ -49,7 +50,12 @@ const hooks = {
         kind: Math.random() < 0.55 ? 'spark' : 'fur',
       });
     }
-    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.85, parts });
+    // Each blast in a run is bigger than the last; the final one (lives already
+    // decremented to 0) nearly fills the screen. mag is the blast radius in px.
+    const n = LIVES - state.lives; // 1-based index of this explosion
+    const diag = Math.hypot(layout.w, layout.h);
+    const mag = EXPLOSION.radius(n, LIVES, diag);
+    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.85, parts, mag });
   },
   spawnHearts(zoneId, points) {
     state.effects.push({ type: 'hearts', zoneId, points, t: 0, life: 1.0 });

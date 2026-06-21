@@ -5,7 +5,7 @@
 // policy) — call unlock() from the first tap.
 // =============================================================================
 
-const MEOW_URL = './assets/dragon-studio-cute-cat-meow-472372.mp3';
+const MEOW_URL = './assets/PXL_20260621_154353075.mp3';
 
 let ctx = null;
 let muted = false;
@@ -74,8 +74,10 @@ export function playMeow(urgency = 0) {
   const t0 = ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = meowBuffer;
-  // higher pitch (and slightly faster) as urgency rises, with a little variety
-  src.playbackRate.value = 1.0 + urgency * 0.95 + (Math.random() - 0.5) * 0.08;
+  // Higher pitch (and slightly faster) as urgency rises, with a little variety.
+  // This is a human "meow" recording, so the urgency factor is kept modest —
+  // pushing it near 2× turns the voice into chipmunk squeak. Tunable here.
+  src.playbackRate.value = 1.0 + urgency * 0.5 + (Math.random() - 0.5) * 0.08;
   const g = ctx.createGain();
   g.gain.value = 0.9;
   src.connect(g).connect(ctx.destination);
@@ -110,16 +112,23 @@ export function playExplosion() {
   const t0 = ctx.currentTime;
   const dur = 0.6;
 
-  // shared bus: master gain → compressor (limiter) → speakers
+  // shared bus: master gain → compressor → makeup gain → speakers.
+  // The compressor glues the layers and tames the transient; a makeup gain
+  // after it (DynamicsCompressorNode has none of its own) pushes the whole
+  // blast back up loud. Tuned so a single boom peaks ~0.84 (measured) — fat
+  // and loud with real headroom so a hot transient or two cats exploding at
+  // once won't clip.
   const bus = ctx.createGain();
-  bus.gain.value = 0.95;
+  bus.gain.value = 1.0;
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.setValueAtTime(-12, t0);
+  comp.threshold.setValueAtTime(-10, t0);
   comp.knee.setValueAtTime(8, t0);
-  comp.ratio.setValueAtTime(14, t0);
-  comp.attack.setValueAtTime(0.002, t0);
+  comp.ratio.setValueAtTime(8, t0);
+  comp.attack.setValueAtTime(0.003, t0);
   comp.release.setValueAtTime(0.25, t0);
-  bus.connect(comp).connect(ctx.destination);
+  const makeup = ctx.createGain();
+  makeup.gain.value = 1.2;
+  bus.connect(comp).connect(makeup).connect(ctx.destination);
 
   // fat filtered-noise blast (the body of the boom)
   const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
