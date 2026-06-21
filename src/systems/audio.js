@@ -1,19 +1,35 @@
 // =============================================================================
-// audio.js — tiny WebAudio synth. No sound files: everything is generated.
-// Must be unlocked by a user gesture (mobile autoplay policy) — call unlock()
-// from the first tap.
+// audio.js — tiny WebAudio layer. Most sounds are synthesized; the cat meow is
+// a real recording (assets/…cat-meow.mp3) played back with a rising pitch as a
+// cat gets more desperate. Must be unlocked by a user gesture (mobile autoplay
+// policy) — call unlock() from the first tap.
 // =============================================================================
+
+const MEOW_URL = './assets/dragon-studio-cute-cat-meow-472372.mp3';
 
 let ctx = null;
 let muted = false;
+let meowBuffer = null;   // decoded recording; null until loaded
+let meowLoading = false;
 
 export function unlock() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
+    loadMeow();
   }
   if (ctx.state === 'suspended') ctx.resume();
+}
+
+function loadMeow() {
+  if (meowBuffer || meowLoading || !ctx) return;
+  meowLoading = true;
+  fetch(MEOW_URL)
+    .then((r) => r.arrayBuffer())
+    .then((buf) => ctx.decodeAudioData(buf))
+    .then((decoded) => { meowBuffer = decoded; })
+    .catch(() => { meowLoading = false; }); // fall back to the synth meow
 }
 
 export function setMuted(v) {
@@ -45,9 +61,29 @@ function tone(freqStart, freqEnd, type, gain, dur) {
   osc.stop(t0 + dur + 0.05);
 }
 
-// A meow: two quick pitch sweeps. `urgency` 0..1 raises pitch + speed.
+// The cat meow (recording). `urgency` 0..1 raises the pitch — calm cats sound
+// normal, panicking ones squeak higher. Falls back to a synth meow until the
+// recording has finished decoding.
 export function playMeow(urgency = 0) {
   if (!ctx || muted) return;
+  if (!meowBuffer) {
+    loadMeow();
+    synthMeow(urgency);
+    return;
+  }
+  const t0 = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = meowBuffer;
+  // higher pitch (and slightly faster) as urgency rises, with a little variety
+  src.playbackRate.value = 1.0 + urgency * 0.95 + (Math.random() - 0.5) * 0.08;
+  const g = ctx.createGain();
+  g.gain.value = 0.9;
+  src.connect(g).connect(ctx.destination);
+  src.start(t0);
+}
+
+// Backup meow if the recording isn't ready yet: two quick pitch sweeps.
+function synthMeow(urgency = 0) {
   const base = 480 + urgency * 360;
   tone(base, base * 1.5, 'sawtooth', 0.12, 0.12);
   setTimeout(() => tone(base * 1.4, base * 0.8, 'sawtooth', 0.1, 0.16), 90);
@@ -66,15 +102,15 @@ export function playWrong() {
   tone(220, 160, 'square', 0.12, 0.18);
 }
 
-// Explosion: a big, dramatic KABOOM — a sharp noise crack, a long rumbling
-// tail, and a deep sub thump. Loud and chaotic, Exploding-Kittens style.
+// Explosion: a compact "stick of dynamite" pop — a short noise crack with a
+// quick low thump. Deliberately small now (no long rumbling KABOOM).
 export function playExplosion() {
   if (!ctx || muted) return;
   const t0 = ctx.currentTime;
-  const dur = 0.85;
+  const dur = 0.32;
 
-  // full-band noise burst that decays into a low rumble
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+  // short filtered noise burst
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) {
     const k = 1 - i / data.length;
@@ -84,17 +120,16 @@ export function playExplosion() {
   noise.buffer = buffer;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(4200, t0);
-  filter.frequency.exponentialRampToValueAtTime(120, t0 + dur);
+  filter.frequency.setValueAtTime(2600, t0);
+  filter.frequency.exponentialRampToValueAtTime(160, t0 + dur);
   const g = ctx.createGain();
-  g.gain.setValueAtTime(0.9, t0);
+  g.gain.setValueAtTime(0.5, t0);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   noise.connect(filter).connect(g).connect(ctx.destination);
   noise.start(t0);
 
-  // deep sub-bass thump + a quick descending "whump" on top
-  tone(160, 32, 'sine', 0.6, 0.55);
-  tone(90, 28, 'triangle', 0.4, 0.45);
+  // a quick punchy thump underneath
+  tone(150, 40, 'sine', 0.35, 0.22);
 }
 
 // Soft tick for UI taps (issuing a command / selecting a target).

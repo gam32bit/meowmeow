@@ -1,92 +1,346 @@
 // =============================================================================
 // render.js — draws the entire scene each frame from (state, layout).
 // Screen shake + DPR scaling are applied by the caller (main.js).
+//
+// The scene is a sunny green yard with a cutaway house in the middle. Cats
+// wander in along the ground on either side; Grandma strolls left-right to
+// fetch a bowl, fill it and carry it out to each cat.
 // =============================================================================
 
 import { TITLE, SUBTITLE, LIVES } from '../config.js';
-import * as art from '../art.js';
 import { catMood } from '../entities/cat.js';
-import { intentIsUseful } from '../entities/grandma.js';
+import * as art from '../art.js';
 
-const SKY = '#2a2440';
-const GROUND = '#3b3357';
-const COUNTER_BG = '#241f33';
+// palette --------------------------------------------------------------------
+const GRASS = '#6cae4d';
+const GRASS_HI = '#84c25f';
+const GRASS_DK = '#588f3f';
+const WALL = '#ecd6a6';      // interior back wall (cutaway)
+const WAINSCOT = '#dcc08c';  // lower wall band
+const POST = '#9c7b48';      // framing posts
+const FLOOR = '#b58a55';     // kitchen floor
+const ROOF = '#c05a44';
+const ROOF_DK = '#9c4634';
 
 export function render(ctx, state, layout) {
-  const { w, h } = layout;
   drawBackground(ctx, layout);
-  drawHud(ctx, state, layout);
 
   if (state.phase === 'playing' || state.phase === 'gameover') {
-    drawZones(ctx, state, layout);
+    drawStations(ctx, state, layout);
     drawCats(ctx, state, layout);
     if (state.grandma) drawGrandma(ctx, state.grandma, layout);
     drawEffects(ctx, state, layout);
-    drawCounter(ctx, state, layout);
+    drawHints(ctx, state, layout);
   }
 
-  // red flash when you tap a cat with the wrong thing in hand
-  if (state.wrongFlash > 0) {
-    ctx.save();
-    ctx.globalAlpha = Math.min(0.4, state.wrongFlash / 600);
-    ctx.fillStyle = '#ff3b3b';
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
-  // bright flash on an explosion
-  if (state.flash > 0) {
-    ctx.save();
-    ctx.globalAlpha = Math.min(0.55, state.flash / 500);
-    ctx.fillStyle = '#ffd9a0';
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
+  drawHud(ctx, state, layout);
 
   if (state.phase === 'start') drawStartScreen(ctx, state, layout);
   if (state.phase === 'gameover') drawGameOver(ctx, state, layout);
 }
 
-// --- background ------------------------------------------------------------
+// --- background: sky, sun, grass, the cutaway house ------------------------
 function drawBackground(ctx, layout) {
-  const { w, h, play, counter } = layout;
-  // sky / night
-  const g = ctx.createLinearGradient(0, 0, 0, counter.y);
-  g.addColorStop(0, SKY);
-  g.addColorStop(1, GROUND);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, counter.y);
+  const { w, h, play, groundY, house } = layout;
 
-  // a cozy house silhouette in the middle
-  const hx = w / 2, hw = w * 0.56, hy = play.y + play.h * 0.14, hh = play.h * 0.66;
-  ctx.fillStyle = '#4a4168';
-  ctx.fillRect(hx - hw / 2, hy, hw, hh);
-  ctx.beginPath(); // roof
-  ctx.moveTo(hx - hw / 2 - 10, hy);
-  ctx.lineTo(hx, hy - hh * 0.4);
-  ctx.lineTo(hx + hw / 2 + 10, hy);
+  // daytime sky
+  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+  sky.addColorStop(0, '#6fb9ef');
+  sky.addColorStop(1, '#cdeafa');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, groundY);
+
+  // sun (top-left, out of the HUD's way over on the right)
+  ctx.fillStyle = '#ffe27a';
+  pixelDisc(ctx, Math.round(w * 0.12), Math.round(play.y + play.h * 0.1), Math.round(Math.min(w, h) * 0.05));
+
+  // a couple of soft clouds
+  cloud(ctx, w * 0.7, play.y + play.h * 0.08, Math.min(w, h) * 0.04);
+  cloud(ctx, w * 0.42, play.y + play.h * 0.16, Math.min(w, h) * 0.03);
+
+  // grass yard
+  ctx.fillStyle = GRASS;
+  ctx.fillRect(0, groundY, w, h - groundY);
+  ctx.fillStyle = GRASS_HI;
+  ctx.fillRect(0, groundY, w, Math.max(3, (h - groundY) * 0.04));
+  ctx.fillStyle = GRASS_DK;
+  ctx.fillRect(0, groundY + (h - groundY) * 0.55, w, (h - groundY) * 0.45);
+
+  drawHouse(ctx, layout);
+}
+
+function drawHouse(ctx, layout) {
+  const { house } = layout;
+  const { left, right, cx, wallTopY, roofTopY, floorY } = house;
+  const wallW = right - left;
+  const wallH = floorY - wallTopY;
+  const oh = Math.round(wallW * 0.1); // roof overhang
+
+  // interior back wall (we see inside — the front wall is "removed")
+  ctx.fillStyle = WALL;
+  ctx.fillRect(left, wallTopY, wallW, wallH);
+  ctx.fillStyle = WAINSCOT;
+  ctx.fillRect(left, floorY - wallH * 0.26, wallW, wallH * 0.26);
+
+  // window on the back wall
+  const wsz = Math.round(wallW * 0.26);
+  const wx = Math.round(cx - wsz / 2);
+  const wy = Math.round(wallTopY + wallH * 0.16);
+  ctx.fillStyle = '#aee0f2';
+  ctx.fillRect(wx, wy, wsz, wsz);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(wx - 3, wy - 3, wsz + 6, 4);            // top frame
+  ctx.fillRect(wx + wsz / 2 - 2, wy, 4, wsz);          // mullion vertical
+  ctx.fillRect(wx, wy + wsz / 2 - 2, wsz, 4);          // mullion horizontal
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(wx, wy, wsz, wsz);
+
+  // floor line
+  ctx.fillStyle = FLOOR;
+  ctx.fillRect(left, floorY - 4, wallW, 6);
+
+  // framing posts (left + right walls, seen edge-on)
+  ctx.fillStyle = POST;
+  ctx.fillRect(left - 7, wallTopY, 7, wallH + 4);
+  ctx.fillRect(right, wallTopY, 7, wallH + 4);
+
+  // roof
+  ctx.fillStyle = ROOF;
+  ctx.beginPath();
+  ctx.moveTo(left - oh, wallTopY);
+  ctx.lineTo(cx, roofTopY);
+  ctx.lineTo(right + oh, wallTopY);
   ctx.closePath();
-  ctx.fillStyle = '#5b5080';
   ctx.fill();
-  // warm windows
-  ctx.fillStyle = '#ffd98a';
-  for (const fx of [0.3, 0.7]) {
-    ctx.fillRect(hx - hw / 2 + hw * fx - hw * 0.07, hy + hh * 0.2, hw * 0.14, hh * 0.18);
-  }
-  // door
-  ctx.fillStyle = '#3a3252';
-  ctx.fillRect(hx - hw * 0.07, hy + hh * 0.5, hw * 0.14, hh * 0.5);
+  ctx.fillStyle = ROOF_DK;
+  ctx.fillRect(left - oh, wallTopY, wallW + oh * 2, Math.max(5, wallH * 0.06));
+}
 
-  // counter band at the bottom (the kitchen)
-  ctx.fillStyle = COUNTER_BG;
-  ctx.fillRect(counter.x, counter.y, counter.w, counter.h);
-  ctx.fillStyle = '#3a3050';
-  ctx.fillRect(counter.x, counter.y, counter.w, 6);
+function cloud(ctx, x, y, r) {
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  for (const [dx, dy, rr] of [[-r, 0, r * 0.9], [0, -r * 0.4, r * 1.1], [r, 0, r * 0.9]]) {
+    pixelDisc(ctx, Math.round(x + dx), Math.round(y + dy), Math.round(rr));
+  }
+}
+
+// a chunky filled "disc" that still reads as pixel-ish
+function pixelDisc(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// --- stations (food + bowls, inside the house on the floor) ----------------
+function drawStations(ctx, state, layout) {
+  drawStack(ctx, layout.foodStack, (c, w, h) => art.foodStackArt(c, w, h));
+  drawStack(ctx, layout.bowlStack, (c, w, h) => art.bowlStackArt(c, w, h));
+}
+
+function drawStack(ctx, rect, drawFn) {
+  ctx.save();
+  ctx.translate(rect.x, rect.y);
+  drawFn(ctx, rect.w, rect.h);
+  ctx.restore();
+}
+
+// --- cats + patience rings -------------------------------------------------
+function drawCats(ctx, state, layout) {
+  for (const z of layout.zones) {
+    const cat = state.cats.find((c) => c.zoneId === z.id && c.status !== 'dead');
+    if (!cat) continue;
+    const pop = easeOutBack(cat.pop);
+    const cy = z.y - z.r; // body centre, sits above the feet line
+
+    // little contact shadow so the cat sits on the grass
+    ctx.fillStyle = 'rgba(0,0,0,0.14)';
+    ctx.beginPath();
+    ctx.ellipse(z.x, z.y, z.r * 0.7, z.r * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (cat.status === 'waiting') drawPatienceRing(ctx, z.x, cy, z.r, cat);
+
+    ctx.save();
+    ctx.translate(z.x, z.y);
+    ctx.scale(pop, pop);
+    art.cat(ctx, z.r, {
+      mood: catMood(cat),
+      color: cat.coat,
+      t: cat.t,
+      facing: -z.side, // face in toward the house
+    });
+    ctx.restore();
+  }
+}
+
+function drawPatienceRing(ctx, cx, cy, r, cat) {
+  const ratio = Math.max(0, cat.patience / cat.patienceMax);
+  const col = ratio > 0.5 ? '#5fd35f' : ratio > 0.22 ? '#ffce4d' : '#ff5b5b';
+  const rad = r * 1.2;
+  ctx.save();
+  ctx.lineWidth = Math.max(3, r * 0.16);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = col;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// --- Grandma ---------------------------------------------------------------
+function drawGrandma(ctx, g, layout) {
+  ctx.save();
+  ctx.translate(Math.round(g.x), Math.round(g.y));
+  art.grandma(ctx, layout.grandmaR, {
+    facing: g.facing,
+    walking: !!g.target,
+    hands: g.hands,
+    phase: g.walkPhase,
+  });
+  ctx.restore();
+}
+
+// --- transient effects: explosions, halos, hearts, "Meow!" -----------------
+function drawEffects(ctx, state, layout) {
+  const { w } = layout;
+  const zoneById = Object.fromEntries(layout.zones.map((z) => [z.id, z]));
+  for (const e of state.effects) {
+    // "nope" — a small red ✗ pulse right on whatever you mis-tapped
+    if (e.type === 'nope') {
+      const p = e.t / e.life;
+      const rr = e.r * (0.7 + p * 0.7);
+      const s = e.r * 0.45;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - p);
+      ctx.strokeStyle = '#ff4d4d';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, rr, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(e.x - s, e.y - s);
+      ctx.lineTo(e.x + s, e.y + s);
+      ctx.moveTo(e.x + s, e.y - s);
+      ctx.lineTo(e.x - s, e.y + s);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    const z = zoneById[e.zoneId];
+    if (!z) continue;
+    const p = e.t / e.life;
+    const cy = z.y - z.r;
+    // keep floating text on-screen even for the edge-of-yard cats
+    const tx = Math.max(w * 0.14, Math.min(w * 0.86, z.x));
+
+    if (e.type === 'explosion') {
+      ctx.save();
+      ctx.translate(z.x, cy);
+      art.explosion(ctx, z.r * 1.7, p, e.parts);
+      ctx.restore();
+      if (p > 0.45) {
+        ctx.save();
+        ctx.translate(z.x, cy - z.r - (p - 0.45) * z.r * 4);
+        art.halo(ctx, z.r * 0.5, Math.max(0, 1 - (p - 0.45) / 0.55));
+        ctx.restore();
+      }
+    } else if (e.type === 'hearts') {
+      ctx.save();
+      ctx.globalAlpha = 1 - p;
+      for (let i = 0; i < 3; i++) {
+        const a = (i - 1) * 0.6;
+        art.heart(ctx, tx + a * z.r, cy - z.r - p * z.r * 2.2, z.r * 0.3, '#ff8fae');
+      }
+      ctx.fillStyle = '#fff7c2';
+      ctx.strokeStyle = '#3a2f20';
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${Math.round(z.r * 0.7)}px system-ui, sans-serif`;
+      const ty = cy - z.r * 1.8 - p * z.r * 2;
+      ctx.strokeText(`+${e.points}`, tx, ty);
+      ctx.fillText(`+${e.points}`, tx, ty);
+      ctx.restore();
+    } else if (e.type === 'meow') {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - p);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#3a3550';
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'round';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${Math.round(z.r * 0.78)}px system-ui, sans-serif`;
+      const ty = cy - z.r * 2 - p * z.r * 1.6;
+      ctx.strokeText('Meow!', tx, ty);
+      ctx.fillText('Meow!', tx, ty);
+      ctx.restore();
+    }
+  }
+}
+
+// --- progressive hints (only the first three actions) ----------------------
+function drawHints(ctx, state, layout) {
+  if (state.phase !== 'playing') return;
+  const step = state.tutorial;
+  if (step === 'bowl') {
+    const r = layout.bowlStack;
+    hintBubble(ctx, r.x, r.y - r.h / 2, 'Grab Bowl', state.time);
+  } else if (step === 'food') {
+    const r = layout.foodStack;
+    hintBubble(ctx, r.x, r.y - r.h / 2, 'Open Food', state.time);
+  } else if (step === 'feed') {
+    // point at the first waiting cat
+    let target = null;
+    for (const z of layout.zones) {
+      if (state.cats.some((c) => c.zoneId === z.id && c.status === 'waiting')) {
+        target = z;
+        break;
+      }
+    }
+    if (target) hintBubble(ctx, target.x, target.y - target.r * 2, 'Feed Cat', state.time);
+  }
+}
+
+function hintBubble(ctx, x, topY, text, time) {
+  const pulse = 0.5 + 0.5 * Math.sin(time * 5);
+  ctx.save();
+  ctx.font = 'bold 16px system-ui, sans-serif';
+  const tw = ctx.measureText(text).width;
+  const pad = 12;
+  const bw = Math.round(tw + pad * 2);
+  const bh = 30;
+  const by = Math.round(topY - bh - 16 - pulse * 5);
+  const bx = Math.round(x - bw / 2);
+
+  ctx.fillStyle = '#2b2533';
+  roundRectPath(ctx, bx, by, bw, bh, 9);
+  ctx.fill();
+  ctx.beginPath(); // little downward tail
+  ctx.moveTo(x - 7, by + bh - 1);
+  ctx.lineTo(x + 7, by + bh - 1);
+  ctx.lineTo(x, by + bh + 9);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#ffe14d';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, by + bh / 2);
+  ctx.restore();
 }
 
 // --- HUD -------------------------------------------------------------------
 function drawHud(ctx, state, layout) {
   const { w, hudH, muteBtn } = layout;
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillStyle = 'rgba(20,16,30,0.28)';
   ctx.fillRect(0, 0, w, hudH);
 
   ctx.textBaseline = 'middle';
@@ -97,31 +351,25 @@ function drawHud(ctx, state, layout) {
   ctx.fillStyle = '#fff';
   ctx.font = `bold ${fs}px system-ui, sans-serif`;
   ctx.fillText(`${state.score}`, 14, hudH * 0.36);
-  ctx.fillStyle = '#b9aee0';
+  ctx.fillStyle = '#eef7ff';
   ctx.font = `${Math.round(fs * 0.62)}px system-ui, sans-serif`;
   ctx.fillText(`best ${state.highScore}`, 14, hudH * 0.74);
 
-  // lives as hearts (center)
-  const hs = hudH * 0.18;
-  const totalW = LIVES * hs * 2.4;
-  let lx = w / 2 - totalW / 2 + hs;
+  // lives as little hearts (centre)
+  const hs = hudH * 0.13;          // heart size param
+  const gap = hudH * 0.5;          // spacing > heart width so they don't merge
+  const startX = w / 2 - ((LIVES - 1) * gap) / 2;
   for (let i = 0; i < LIVES; i++) {
-    art.heart(ctx, lx, hudH * 0.4, hs, i < state.lives ? '#ff5b7f' : '#5b5470');
-    lx += hs * 2.4;
+    const alive = i < state.lives;
+    art.heart(ctx, startX + i * gap, hudH * 0.4, hs, alive ? '#ff5b7a' : 'rgba(255,255,255,0.25)');
   }
-  // level + combo under the hearts
+  ctx.fillStyle = '#eef7ff';
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#cfc6ee';
-  ctx.font = `${Math.round(fs * 0.6)}px system-ui, sans-serif`;
-  const comboTxt = state.combo > 1 ? `  ·  combo x${state.combo}` : '';
-  ctx.fillText(`level ${state.level + 1}${comboTxt}`, w / 2, hudH * 0.8);
+  ctx.font = `${Math.round(fs * 0.5)}px system-ui, sans-serif`;
+  ctx.fillText(`level ${state.level + 1}`, w / 2, hudH * 0.78);
 
-  // mute button (right)
-  ctx.beginPath();
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.arc(muteBtn.x, muteBtn.y, muteBtn.r, 0, Math.PI * 2);
-  ctx.fill();
-  drawSpeaker(ctx, muteBtn.x, muteBtn.y, muteBtn.r * 0.7, state.muted);
+  // mute speaker (right)
+  drawSpeaker(ctx, muteBtn.x, muteBtn.y, muteBtn.r, state.muted);
 }
 
 function drawSpeaker(ctx, cx, cy, r, muted) {
@@ -154,232 +402,35 @@ function drawSpeaker(ctx, cx, cy, r, muted) {
   ctx.restore();
 }
 
-// --- zones (ground markers; cats drawn separately) -------------------------
-function drawZones(ctx, state, layout) {
-  for (const z of layout.zones) {
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.ellipse(z.x, z.y + z.r * 0.8, z.r * 1.1, z.r * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-// --- cats + their patience rings -------------------------------------------
-function drawCats(ctx, state, layout) {
-  const canServe = state.grandma && intentIsUseful(state.grandma, 'feed');
-  for (const cat of state.cats) {
-    if (cat.status === 'dead') continue;
-    const z = layout.zones.find((zz) => zz.id === cat.zoneId);
-    if (!z) continue;
-    const mood = catMood(cat);
-
-    ctx.save();
-    ctx.translate(z.x, z.y);
-    // pop-in + a little happy hop when leaving
-    let s = 0.6 + 0.4 * cat.pop;
-    if (cat.status === 'leaving') {
-      s *= 1 + 0.1 * Math.sin(cat.leaveTimer * 18);
-      ctx.globalAlpha = Math.max(0, 1 - cat.leaveTimer / 0.8);
-      ctx.translate(0, -cat.leaveTimer * 40);
-    }
-    // panic shudder
-    if (mood === 'panic') ctx.translate(Math.sin(cat.t * 40) * 2, 0);
-    ctx.scale(s, s);
-    art.cat(ctx, z.r * 0.85, { mood, color: cat.coat, t: cat.t });
-    ctx.restore();
-
-    if (cat.status === 'waiting') {
-      drawPatienceRing(ctx, z, cat);
-      drawHungerBubble(ctx, z, cat);
-      // when Grandma is holding a full bowl, gently highlight who can be served
-      if (canServe) drawTapHint(ctx, z.x, z.y, z.r * 1.5, state.time, '#ffd166');
-    }
-  }
-}
-
-function drawPatienceRing(ctx, z, cat) {
-  const ratio = Math.max(0, cat.patience / cat.patienceMax);
-  const col = ratio > 0.5 ? '#6fe06f' : ratio > 0.22 ? '#ffd166' : '#ff5b5b';
-  ctx.save();
-  ctx.lineWidth = z.r * 0.16;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-  ctx.beginPath();
-  ctx.arc(z.x, z.y, z.r * 1.15, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = col;
-  ctx.beginPath();
-  ctx.arc(z.x, z.y, z.r * 1.15, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-// A simple speech bubble with a bowl icon — every cat just wants a bowl of food.
-function drawHungerBubble(ctx, z, cat) {
-  const bw = z.r * 1.3, bh = z.r * 1.0;
-  const bx = z.x - bw / 2, by = z.y - z.r * 2.6;
-  ctx.save();
-  ctx.fillStyle = '#fff';
-  roundRectPath(ctx, bx, by, bw, bh, bh * 0.3);
-  ctx.fill();
-  ctx.beginPath(); // tail
-  ctx.moveTo(z.x - bh * 0.16, by + bh);
-  ctx.lineTo(z.x + bh * 0.16, by + bh);
-  ctx.lineTo(z.x, by + bh + bh * 0.28);
-  ctx.closePath();
-  ctx.fill();
-  // a little bowl-of-food icon
-  ctx.translate(z.x, by + bh * 0.5);
-  art.bowl(ctx, bh * 0.42, true);
-  ctx.restore();
-}
-
-// --- Grandma ---------------------------------------------------------------
-function drawGrandma(ctx, g, layout) {
-  const walking = !!g.target;
-  const bob = walking ? Math.abs(Math.sin(g.walkPhase)) * layout.grandmaR * 0.12 : 0;
-  ctx.save();
-  ctx.translate(g.x, g.y - bob);
-  art.grandma(ctx, layout.grandmaR, {
-    facing: g.facing,
-    walking,
-    phase: g.walkPhase,
-    hands: g.hands,
-    acting: g.acting > 0,
-  });
-  ctx.restore();
-}
-
-// --- transient effects -----------------------------------------------------
-function drawEffects(ctx, state, layout) {
-  for (const e of state.effects) {
-    const z = layout.zones.find((zz) => zz.id === e.zoneId);
-    if (!z) continue;
-    const p = e.t / e.life; // 0..1 progress
-    if (e.type === 'explosion') {
-      ctx.save();
-      ctx.translate(z.x, z.y);
-      art.explosion(ctx, z.r * 2.4, p, e.parts);
-      ctx.restore();
-      // a little halo floats up afterward (the dark-humor beat)
-      if (p > 0.5) {
-        ctx.save();
-        ctx.translate(z.x, z.y - z.r * 1.2 - (p - 0.5) * z.r * 4);
-        art.halo(ctx, z.r * 0.55, Math.max(0, 1 - (p - 0.5) / 0.5));
-        ctx.restore();
-      }
-    } else if (e.type === 'hearts') {
-      ctx.save();
-      ctx.globalAlpha = 1 - p;
-      for (let i = 0; i < 3; i++) {
-        const a = (i - 1) * 0.5;
-        art.heart(ctx, z.x + a * z.r, z.y - z.r - p * z.r * 2.2, z.r * 0.26, '#ff8fae');
-      }
-      ctx.fillStyle = '#fff7c2';
-      ctx.textAlign = 'center';
-      ctx.font = `bold ${Math.round(z.r * 0.55)}px system-ui, sans-serif`;
-      ctx.fillText(`+${e.points}`, z.x, z.y - z.r * 1.6 - p * z.r * 2);
-      ctx.restore();
-    }
-  }
-}
-
-// --- counter: the two tappable stacks --------------------------------------
-function drawCounter(ctx, state, layout) {
-  const g = state.grandma;
-  const foodUseful = g && intentIsUseful(g, 'food');
-  const bowlUseful = g && intentIsUseful(g, 'bowl');
-
-  drawStack(ctx, layout.foodStack, 'Cat Food', state.time, foodUseful, (c, w, h) =>
-    art.foodStackArt(c, w, h)
-  );
-  drawStack(ctx, layout.bowlStack, 'Bowls', state.time, bowlUseful, (c, w, h) =>
-    art.bowlStackArt(c, w, h)
-  );
-}
-
-function drawStack(ctx, rect, label, time, useful, drawArt) {
-  // platform
-  ctx.save();
-  roundRectPath(ctx, rect.x - rect.w / 2, rect.y - rect.h / 2, rect.w, rect.h, rect.w * 0.1);
-  ctx.fillStyle = useful ? 'rgba(255,217,138,0.16)' : 'rgba(255,255,255,0.06)';
-  ctx.fill();
-  if (useful) {
-    ctx.strokeStyle = '#ffd98a';
-    ctx.lineWidth = 2 + Math.sin(time * 5) + 1.5;
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // the stacked items
-  ctx.save();
-  ctx.translate(rect.x, rect.y);
-  drawArt(ctx, rect.w * 0.7, rect.h * 0.7);
-  ctx.restore();
-
-  // label
-  ctx.fillStyle = '#e9e2ff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.font = `bold ${Math.round(rect.h * 0.16)}px system-ui, sans-serif`;
-  ctx.fillText(label, rect.x, rect.y + rect.h * 0.52);
-}
-
-// A soft pulsing ring used to point the player at what to tap next.
-function drawTapHint(ctx, x, y, r, time, color) {
-  const pulse = 0.5 + 0.5 * Math.sin(time * 5);
-  ctx.save();
-  ctx.globalAlpha = 0.25 + pulse * 0.4;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = r * 0.08;
-  ctx.beginPath();
-  ctx.arc(x, y, r * (1 + pulse * 0.08), 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
 // --- overlays --------------------------------------------------------------
 function drawStartScreen(ctx, state, layout) {
-  const { w, h } = layout;
-  dim(ctx, w, h, 0.55);
+  const { w, h, groundY } = layout;
+  dim(ctx, w, h, 0.4);
   ctx.textAlign = 'center';
 
-  // Grandma waving hello
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.round(Math.min(w, h) * 0.12)}px system-ui, sans-serif`;
+  ctx.fillText(TITLE, w / 2, h * 0.18);
+  ctx.fillStyle = '#ffe27a';
+  ctx.font = `${Math.round(Math.min(w, h) * 0.05)}px system-ui, sans-serif`;
+  ctx.fillText(SUBTITLE, w / 2, h * 0.25);
+
+  // Grandma standing in her doorway, holding a full bowl, ready to go
   ctx.save();
-  ctx.translate(w / 2, h * 0.28);
-  art.grandma(ctx, Math.min(w, h) * 0.1, { facing: 1, hands: 'fullbowl' });
+  ctx.translate(w / 2, groundY);
+  art.grandma(ctx, layout.grandmaR * 1.25, { facing: 1, hands: 'fullbowl' });
   ctx.restore();
 
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.round(Math.min(w, h) * 0.11)}px system-ui, sans-serif`;
-  ctx.fillText(TITLE, w / 2, h * 0.46);
-  ctx.fillStyle = '#ffd98a';
-  ctx.font = `${Math.round(Math.min(w, h) * 0.045)}px system-ui, sans-serif`;
-  ctx.fillText(SUBTITLE, w / 2, h * 0.53);
-
-  ctx.fillStyle = '#cfc6ee';
-  ctx.font = `${Math.round(Math.min(w, h) * 0.033)}px system-ui, sans-serif`;
-  const lines = [
-    'Tap Cat Food, then Bowls (either order)',
-    'to make a bowl. Grandma walks to fetch each.',
-    'Then tap a hungry cat to feed it in time —',
-    "don't let one go BOOM! 💥",
-  ];
-  lines.forEach((t, i) => ctx.fillText(t, w / 2, h * 0.61 + i * Math.min(w, h) * 0.045));
-
-  if (state.highScore > 0) {
-    ctx.fillStyle = '#fff7c2';
-    ctx.fillText(`Best: ${state.highScore}`, w / 2, h * 0.82);
-  }
-  pulseText(ctx, 'TAP TO START', w / 2, h * 0.9, Math.min(w, h) * 0.05, state.time);
+  pulseText(ctx, 'TAP TO START', w / 2, h * 0.6, Math.min(w, h) * 0.055, state.time);
 }
 
 function drawGameOver(ctx, state, layout) {
   const { w, h } = layout;
-  dim(ctx, w, h, 0.62);
+  dim(ctx, w, h, 0.6);
   ctx.textAlign = 'center';
+
   ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.round(Math.min(w, h) * 0.09)}px system-ui, sans-serif`;
+  ctx.font = `bold ${Math.round(Math.min(w, h) * 0.1)}px system-ui, sans-serif`;
   ctx.fillText('Game Over', w / 2, h * 0.34);
 
   ctx.font = `${Math.round(Math.min(w, h) * 0.05)}px system-ui, sans-serif`;
@@ -391,10 +442,10 @@ function drawGameOver(ctx, state, layout) {
     ctx.font = `bold ${Math.round(Math.min(w, h) * 0.055)}px system-ui, sans-serif`;
     ctx.fillText('★ NEW HIGH SCORE! ★', w / 2, h * 0.63);
   } else {
-    ctx.fillStyle = '#cfc6ee';
+    ctx.fillStyle = '#eef7ff';
     ctx.fillText(`Best: ${state.highScore}`, w / 2, h * 0.63);
   }
-  pulseText(ctx, 'TAP TO PLAY AGAIN', w / 2, h * 0.78, Math.min(w, h) * 0.045, state.time);
+  pulseText(ctx, 'TAP TO PLAY AGAIN', w / 2, h * 0.78, Math.min(w, h) * 0.05, state.time);
 }
 
 // --- small drawing utilities ----------------------------------------------
@@ -422,4 +473,11 @@ function roundRectPath(ctx, x, y, wd, ht, r) {
   ctx.arcTo(x, y + ht, x, y, rr);
   ctx.arcTo(x, y, x + wd, y, rr);
   ctx.closePath();
+}
+function easeOutBack(p) {
+  if (p >= 1) return 1;
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const x = p - 1;
+  return 1 + c3 * x * x * x + c1 * x * x;
 }

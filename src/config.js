@@ -21,13 +21,15 @@ export const GRANDMA = {
 };
 
 // --- Cat zones (where cats appear around the house) ------------------------
-// Positions are fractions of the play area (0..1), resolved to pixels at
-// layout time. Keeps everything responsive.
+// The scene is horizontal: the house sits in the middle and stray cats wander
+// in along the ground on either side of it. `fx` is a fraction of the play
+// width; every cat stands on the same ground line (resolved in layout.js), so
+// Grandma's whole journey is a left-right stroll.
 export const ZONES = [
-  { id: 'door',   label: 'Front Door', fx: 0.16, fy: 0.22 },
-  { id: 'window', label: 'Window',     fx: 0.84, fy: 0.20 },
-  { id: 'porch',  label: 'Back Porch', fx: 0.16, fy: 0.58 },
-  { id: 'garden', label: 'Garden',     fx: 0.84, fy: 0.56 },
+  { id: 'farLeft',  label: 'Yard',  fx: 0.06, side: -1 },
+  { id: 'left',     label: 'Step',  fx: 0.24, side: -1 },
+  { id: 'right',    label: 'Step',  fx: 0.76, side: 1 },
+  { id: 'farRight', label: 'Yard',  fx: 0.94, side: 1 },
 ];
 
 // --- Difficulty curve ------------------------------------------------------
@@ -60,8 +62,11 @@ export const SCORE = {
 };
 
 // --- Feel ------------------------------------------------------------------
+// The explosion is deliberately LOCAL now — a little stick-of-dynamite pop
+// right on the cat, no whole-screen shake or flash (those overwhelmed the
+// scene and could stutter on phones). Keep these at 0 unless you want drama.
 export const FEEL = {
-  explosionShake: 34,       // screen shake magnitude on explosion (px)
-  explosionFlashMs: 320,    // white/orange full-screen flash on explosion
-  wrongFlashMs: 250,        // red flash when you tap a cat with empty hands
+  explosionShake: 0,        // screen shake magnitude on explosion (px)
+  explosionFlashMs: 0,      // full-screen flash on explosion (ms)
+  wrongFlashMs: 400,        // how long the local red "✗" shows on a mis-tap (ms)
 };

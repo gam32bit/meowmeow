@@ -20,13 +20,16 @@ export function createState() {
     time: 0,             // seconds since game start (drives spawner + animation)
     spawnTimer: 0,       // counts down to next spawn
 
+    // First-run hints, shown one at a time then gone for good:
+    // 'bowl' → 'food' → 'feed' → 'done'.
+    tutorial: 'bowl',
+
     cats: [],            // active Cat instances
     grandma: null,       // the player's avatar; created lazily once layout exists
     effects: [],         // transient visual effects (explosions, hearts)
 
-    shake: 0,            // current screen-shake magnitude
-    flash: 0,            // ms remaining of the explosion full-screen flash
-    wrongFlash: 0,       // ms remaining of the red "need food" flash
+    shake: 0,            // current screen-shake magnitude (explosions keep this 0)
+    flash: 0,            // ms remaining of any full-screen flash (kept 0 now)
     muted: false,
   };
 }

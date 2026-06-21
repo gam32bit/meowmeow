@@ -19,7 +19,9 @@ export function updateSpawner(state, dt) {
     return;
   }
 
-  const occupied = new Set(liveCats.map((c) => c.zoneId));
+  // A zone is taken by any cat that hasn't fully left yet (including the ~0.8s
+  // a fed cat spends happily walking off) so a new cat never pops on top of one.
+  const occupied = new Set(state.cats.filter((c) => c.status !== 'dead').map((c) => c.zoneId));
   const free = ZONES.filter((z) => !occupied.has(z.id));
   if (free.length === 0) {
     state.spawnTimer = 0.5;

@@ -61,13 +61,13 @@ export function handleTap(state, layout, px, py, hooks) {
   for (const z of layout.zones) {
     const cat = state.cats.find((c) => c.zoneId === z.id && c.status === 'waiting');
     if (!cat) continue;
-    if (dist2(px, py, z.x, z.y) <= (z.r * 1.6) ** 2) {
+    if (dist2(px, py, z.x, z.y - z.r) <= (z.r * 1.9) ** 2) {
       if (intentIsUseful(g, 'feed')) {
-        // Stand just in front of (below) the cat to serve it.
-        sendGrandma(g, { x: z.x, y: z.y + z.r * 1.4 }, { type: 'feed', catId: cat.id });
+        // Stand on the house side of the cat and serve it.
+        sendGrandma(g, { x: z.x - z.side * z.r * 1.2, y: z.y }, { type: 'feed', catId: cat.id });
         audio.playTap();
       } else {
-        state.wrongFlash = FEEL.wrongFlashMs;
+        nope(state, z.x, z.y - z.r, z.r * 1.3); // need a full bowl first
         audio.playWrong();
       }
       return;
@@ -78,11 +78,16 @@ export function handleTap(state, layout, px, py, hooks) {
 // Walk Grandma to a station if the action would actually do something.
 function command(state, g, station, type, hooks) {
   if (intentIsUseful(g, type)) {
-    // Stand just above the counter stack so she faces it.
-    sendGrandma(g, { x: station.x, y: station.y - station.h * 0.55 }, { type });
+    // Walk over and stand on the floor at the station (its rect's base = ground).
+    sendGrandma(g, { x: station.x, y: station.y + station.h / 2 }, { type });
     audio.playTap();
   } else {
-    state.wrongFlash = FEEL.wrongFlashMs;
+    nope(state, station.x, station.y, station.w * 0.4);
     audio.playWrong();
   }
+}
+
+// A small, local "✗" feedback effect right where you mis-tapped.
+function nope(state, x, y, r) {
+  state.effects.push({ type: 'nope', x, y, r, t: 0, life: FEEL.wrongFlashMs / 1000 });
 }

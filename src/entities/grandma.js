@@ -99,13 +99,8 @@ function finishAction(g, state, hooks) {
   }
 }
 
-// Keep her on-screen if the window was resized out from under her.
+// Keep her on-screen (and on the ground line) if the window was resized.
 export function clampGrandma(g, layout) {
-  const { play, counter } = layout;
-  const minX = layout.w * 0.06;
-  const maxX = layout.w * 0.94;
-  const minY = play.y + play.h * 0.12;
-  const maxY = counter.y + counter.h * 0.55;
-  g.x = Math.max(minX, Math.min(maxX, g.x));
-  g.y = Math.max(minY, Math.min(maxY, g.y));
+  g.x = Math.max(layout.w * 0.04, Math.min(layout.w * 0.96, g.x));
+  g.y = layout.groundY;
 }

@@ -40,16 +40,16 @@ resize();
 // --- hooks: how entities reach audio + effects + game-over -----------------
 const hooks = {
   spawnExplosion(zoneId) {
-    // pre-generate flying debris so each blast is unique
+    // pre-generate a little flying debris so each pop varies (kept small)
     const parts = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 11; i++) {
       parts.push({
         a: Math.random() * Math.PI * 2,
-        sp: 0.6 + Math.random() * 1.7,
-        kind: Math.random() < 0.5 ? 'spark' : 'fur',
+        sp: 0.7 + Math.random() * 1.4,
+        kind: Math.random() < 0.55 ? 'spark' : 'fur',
       });
     }
-    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.95, parts });
+    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.6, parts });
   },
   spawnHearts(zoneId, points) {
     state.effects.push({ type: 'hearts', zoneId, points, t: 0, life: 1.0 });
@@ -92,7 +92,6 @@ function update(dt) {
 
   // decay feedback timers
   if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 60);
-  if (state.wrongFlash > 0) state.wrongFlash = Math.max(0, state.wrongFlash - dt * 1000);
   if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 1000);
 
   // advance effects, drop finished ones
@@ -104,23 +103,35 @@ function update(dt) {
   // make sure Grandma exists now that a run is underway
   if (!state.grandma) state.grandma = makeGrandma(layout.home);
   updateGrandma(state.grandma, dt, state, layout, hooks);
+  advanceTutorial(state);
 
   updateSpawner(state, dt);
 
   for (const cat of state.cats) {
     updateCat(cat, dt, state, hooks);
-    // periodic meow with rising urgency as patience drains
+    // periodic meow with rising urgency as patience drains; the "Meow!"
+    // pops up with the trigger (so it shows even while audio is muted/loading)
     if (cat.status === 'waiting') {
       cat.meowTimer -= dt;
       if (cat.meowTimer <= 0) {
         const ratio = cat.patience / cat.patienceMax;
         const urgency = 1 - Math.max(0, Math.min(1, ratio));
         audio.playMeow(urgency);
-        cat.meowTimer = 0.6 + ratio * 2.2; // calmer cats meow less often
+        state.effects.push({ type: 'meow', zoneId: cat.zoneId, t: 0, life: 0.85 });
+        cat.meowTimer = 0.7 + ratio * 2.2; // calmer cats meow less often
       }
     }
   }
   state.cats = state.cats.filter((c) => c.status !== 'dead');
+}
+
+// Walk the one-time hint flow forward as the player completes each first action.
+function advanceTutorial(state) {
+  const g = state.grandma;
+  if (!g) return;
+  if (state.tutorial === 'bowl' && (g.hands === 'bowl' || g.hands === 'fullbowl')) state.tutorial = 'food';
+  if (state.tutorial === 'food' && g.hands === 'fullbowl') state.tutorial = 'feed';
+  if (state.tutorial === 'feed' && state.catsFed >= 1) state.tutorial = 'done';
 }
 
 // --- loop ------------------------------------------------------------------
@@ -131,18 +142,24 @@ function frame(now) {
   if (hidden) dt = 0;
   dt = Math.min(dt, 0.05); // clamp big gaps (tab switches, slow frames)
 
-  update(dt);
+  // Anything that throws in here must NOT kill the loop — otherwise the screen
+  // freezes while already-scheduled audio keeps playing. So we always
+  // reschedule in `finally`, and log the error instead of dying.
+  try {
+    update(dt);
 
-  // screen shake
-  ctx.save();
-  if (state.shake > 0) {
-    const s = state.shake;
-    ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    ctx.save();
+    if (state.shake > 0) {
+      const s = state.shake;
+      ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    }
+    render(ctx, state, layout);
+    ctx.restore();
+  } catch (err) {
+    console.error('[meowmeow] frame error', err);
+  } finally {
+    requestAnimationFrame(frame);
   }
-  render(ctx, state, layout);
-  ctx.restore();
-
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 

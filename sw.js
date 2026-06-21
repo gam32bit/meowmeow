@@ -3,7 +3,7 @@
 // serves cache-first, falling back to the network. Bump CACHE when files change.
 // =============================================================================
 
-const CACHE = 'meowmeow-v2';
+const CACHE = 'meowmeow-v3';
 
 const ASSETS = [
   './',
@@ -24,6 +24,7 @@ const ASSETS = [
   './src/systems/storage.js',
   './assets/icon-192.png',
   './assets/icon-512.png',
+  './assets/dragon-studio-cute-cat-meow-472372.mp3',
 ];
 
 self.addEventListener('install', (e) => {
