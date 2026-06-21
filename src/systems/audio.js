@@ -102,14 +102,26 @@ export function playWrong() {
   tone(220, 160, 'square', 0.12, 0.18);
 }
 
-// Explosion: a compact "stick of dynamite" pop — a short noise crack with a
-// quick low thump. Deliberately small now (no long rumbling KABOOM).
+// Explosion: a big, loud KABOOM — a fat filtered-noise blast, a deep sub-boom
+// and a punchy crack, all summed through a limiter so it hits hard without
+// turning into harsh clipping.
 export function playExplosion() {
   if (!ctx || muted) return;
   const t0 = ctx.currentTime;
-  const dur = 0.32;
+  const dur = 0.6;
 
-  // short filtered noise burst
+  // shared bus: master gain → compressor (limiter) → speakers
+  const bus = ctx.createGain();
+  bus.gain.value = 0.95;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-12, t0);
+  comp.knee.setValueAtTime(8, t0);
+  comp.ratio.setValueAtTime(14, t0);
+  comp.attack.setValueAtTime(0.002, t0);
+  comp.release.setValueAtTime(0.25, t0);
+  bus.connect(comp).connect(ctx.destination);
+
+  // fat filtered-noise blast (the body of the boom)
   const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) {
@@ -120,16 +132,32 @@ export function playExplosion() {
   noise.buffer = buffer;
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(2600, t0);
-  filter.frequency.exponentialRampToValueAtTime(160, t0 + dur);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.5, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  noise.connect(filter).connect(g).connect(ctx.destination);
+  filter.frequency.setValueAtTime(4200, t0);
+  filter.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(1.0, t0);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  noise.connect(filter).connect(ng).connect(bus);
   noise.start(t0);
 
-  // a quick punchy thump underneath
-  tone(150, 40, 'sine', 0.35, 0.22);
+  // deep sub-boom that rolls underneath
+  busTone(bus, 120, 30, 'sine', 0.9, 0.55, t0);
+  // sharp punchy crack on the front
+  busTone(bus, 240, 55, 'triangle', 0.55, 0.18, t0);
+}
+
+// like tone(), but plays into a provided node (e.g. the explosion limiter bus).
+function busTone(dest, freqStart, freqEnd, type, gain, dur, t0) {
+  if (!ctx || muted) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freqStart, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+  env(g, gain, t0, 0.005, dur * 0.3, dur * 0.65);
+  osc.connect(g).connect(dest);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
 }
 
 // Soft tick for UI taps (issuing a command / selecting a target).

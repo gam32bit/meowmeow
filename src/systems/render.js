@@ -7,7 +7,7 @@
 // fetch a bowl, fill it and carry it out to each cat.
 // =============================================================================
 
-import { TITLE, SUBTITLE, LIVES } from '../config.js';
+import { TITLE, SUBTITLE, LIVES, FEEL } from '../config.js';
 import { catMood } from '../entities/cat.js';
 import * as art from '../art.js';
 
@@ -34,9 +34,18 @@ export function render(ctx, state, layout) {
   }
 
   drawHud(ctx, state, layout);
+  drawFlash(ctx, state, layout);
 
   if (state.phase === 'start') drawStartScreen(ctx, state, layout);
   if (state.phase === 'gameover') drawGameOver(ctx, state, layout);
+}
+
+// full-screen blast flash — a quick warm wash right when a cat explodes
+function drawFlash(ctx, state, layout) {
+  if (state.flash <= 0 || FEEL.explosionFlashMs <= 0) return;
+  const a = Math.min(1, state.flash / FEEL.explosionFlashMs) * 0.5;
+  ctx.fillStyle = `rgba(255,236,180,${a})`;
+  ctx.fillRect(0, 0, layout.w, layout.h);
 }
 
 // --- background: sky, sun, grass, the cutaway house ------------------------
@@ -243,7 +252,7 @@ function drawEffects(ctx, state, layout) {
     if (e.type === 'explosion') {
       ctx.save();
       ctx.translate(z.x, cy);
-      art.explosion(ctx, z.r * 1.7, p, e.parts);
+      art.explosion(ctx, z.r * 3.2, p, e.parts);
       ctx.restore();
       if (p > 0.45) {
         ctx.save();

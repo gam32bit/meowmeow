@@ -1,0 +1,84 @@
+<!doctype html><meta charset="utf-8"><title>boom level</title>
+<script type="module">
+const SR = 44100, DUR = 1.2;
+
+function noiseBuffer(ctx, dur) {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  // fixed seed-ish: deterministic pseudo-random so old vs new compare fairly
+  let s = 12345;
+  for (let i = 0; i < d.length; i++) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    const k = 1 - i / d.length;
+    d[i] = ((s / 0x7fffffff) * 2 - 1) * k * k;
+  }
+  return buf;
+}
+function env(g, gain, t0, a, h, r) {
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + a);
+  g.gain.setValueAtTime(gain, t0 + a + h);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + h + r);
+}
+function osc(ctx, dest, f0, f1, type, gain, dur, t0) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t0);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t0 + dur);
+  env(g, gain, t0, 0.005, dur * 0.3, dur * 0.65);
+  o.connect(g).connect(dest); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+
+// --- OLD explosion graph (the previous code) ---
+function buildOld(ctx) {
+  const t0 = 0, dur = 0.32;
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer(ctx, dur);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(2600, t0); f.frequency.exponentialRampToValueAtTime(160, t0 + dur);
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.5, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  noise.connect(f).connect(g).connect(ctx.destination); noise.start(t0);
+  osc(ctx, ctx.destination, 150, 40, 'sine', 0.35, 0.22, t0); // thump (env via osc helper ~matches)
+}
+
+// --- NEW candidate: bus -> comp -> makeup -> destination ---
+function buildNew(ctx, p) {
+  const t0 = 0, dur = 0.6;
+  const bus = ctx.createGain(); bus.gain.value = 1.0;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(p.thresh, t0);
+  comp.knee.setValueAtTime(p.knee, t0);
+  comp.ratio.setValueAtTime(p.ratio, t0);
+  comp.attack.setValueAtTime(0.003, t0);
+  comp.release.setValueAtTime(0.25, t0);
+  const makeup = ctx.createGain(); makeup.gain.value = p.makeup;
+  bus.connect(comp).connect(makeup).connect(ctx.destination);
+
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer(ctx, dur);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(4200, t0); f.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+  const ng = ctx.createGain(); ng.gain.setValueAtTime(1.0, t0); ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  noise.connect(f).connect(ng).connect(bus); noise.start(t0);
+  osc(ctx, bus, 120, 30, 'sine', 0.9, 0.55, t0);
+  osc(ctx, bus, 240, 55, 'triangle', 0.55, 0.18, t0);
+}
+
+async function render(buildFn) {
+  const ctx = new OfflineAudioContext(1, Math.ceil(SR * DUR), SR);
+  buildFn(ctx);
+  const buf = await ctx.startRendering();
+  const d = buf.getChannelData(0);
+  let peak = 0, sum = 0;
+  for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; sum += d[i] * d[i]; }
+  return { peak: +peak.toFixed(4), rms: +Math.sqrt(sum / d.length).toFixed(4) };
+}
+
+const cands = {
+  'thr-8_r6_mk2.2':  { thresh: -8, knee: 6, ratio: 6, makeup: 2.2 },
+  'thr-6_r4_mk1.8':  { thresh: -6, knee: 6, ratio: 4, makeup: 1.8 },
+  'thr-3_r6_mk1.5':  { thresh: -3, knee: 4, ratio: 6, makeup: 1.5 },
+  'thr-10_r8_mk2.8': { thresh: -10, knee: 8, ratio: 8, makeup: 2.8 },
+};
+const out = { old: await render(buildOld), new: {} };
+for (const [name, p] of Object.entries(cands)) out.new[name] = await render((c) => buildNew(c, p));
+window.__result = out;
+document.body.textContent = JSON.stringify(out, null, 2);
+</script>

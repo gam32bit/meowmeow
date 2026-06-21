@@ -43,29 +43,38 @@ export function heart(ctx, cx, cy, s, color) {
   ctx.restore();
 }
 
-// --- the cat (no face — simplified silhouette) -----------------------------
-// mood: 'calm' | 'worried' | 'panic' | 'happy'. `t` drives a little idle bob /
-// tail flick; panic adds a nervous jitter.
+// --- the cat (sitting kitty: ears, face, belly, front paws, curled tail) ---
+// mood: 'calm' | 'worried' | 'panic' | 'happy'. `t` drives a little idle bob;
+// panic adds a nervous jitter. Face features (E eyes, P nose) are baked in so
+// it always reads as a cat; the patience ring + jitter carry the urgency.
 const CAT = [
-  '..C.......C..',
-  '..CC.....CC..',
-  '..CDC...CDC..',
-  '...CCCCCCC..C',
-  '..CCCCCCCCCCC',
-  '..CCCCCCCCCCC',
-  '..CCCCCCCCCCC',
-  '..CCCCCCCCC.C',
-  '..CCCCCCCCC..',
-  '..CCCCCCCCC..',
-  '..CCCCCCCCC..',
-  '..CC.CCC.CC..',
-  '..CC.CCC.CC..',
+  '...C.....C...', //  0 ear tips
+  '..CCC...CCC..', //  1 ears
+  '..CPC...CPC..', //  2 pink inner ears
+  '..CCCCCCCCC..', //  3 head top
+  '.CCCCCCCCCCC.', //  4 head
+  '.CCEECCCEECC.', //  5 eyes
+  '.CCCLLPLLCCC.', //  6 nose + muzzle
+  '..CCLLLLLCC..', //  7 chin
+  '..CCCCCCCCC..', //  8 neck
+  '.CCCCCCCCCCC.', //  9 chest
+  '.CCCLLLLLCCC.', // 10 belly
+  '.CCCLLLLLCCCD', // 11 belly + tail down the side
+  '.CCCCCCCCCCCD', // 12 lower body + tail
+  '.CCC.CCC.CCDD', // 13 front paws + tail curl
+  '......DDDDD..', // 14 tail tip hooks across the front
 ];
 
 export function cat(ctx, r, opts = {}) {
   const { mood = 'calm', color = '#9b8bb4', t = 0, facing = 1 } = opts;
   const px = Math.max(2, Math.round(r / 6));
-  const palette = { C: color, D: shade(color, -55) };
+  const palette = {
+    C: color,
+    D: shade(color, -50),  // tail / shading
+    L: shade(color, 62),   // light belly + muzzle
+    E: '#23202b',          // eyes
+    P: '#e98ba1',          // pink nose + inner ears
+  };
 
   ctx.save();
   // idle breathing bob; panic = fast nervous shiver
@@ -78,37 +87,43 @@ export function cat(ctx, r, opts = {}) {
   ctx.restore();
 }
 
-// --- Grandma (just hair + glasses, cozy cardigan) --------------------------
+// --- Grandma (brown hair + round glasses + cozy buttoned cardigan) ---------
 // Drawn standing with her feet on the origin. `hands` selects what she cradles;
-// `walking` adds a 1px waddle bob; `facing` flips her left/right.
+// `walking` adds a 1px waddle bob; `facing` flips her left/right. Body is kept
+// armless-blocky so the bowl/can she cradles in front always reads cleanly.
 const GMA = [
-  '.....HHH.....',
-  '....HHHHH....',
-  '...HHHHHHH...',
-  '..HHHHHHHHH..',
-  '..HHSSSSSHH..',
-  '..HSSSSSSSH..',
-  '..HSGgSgGSH..',
-  '..HSSSSSSSH..',
-  '...SSSSSSS...',
-  '...CCCCCCC...',
-  '.CCCCCWCCCCC.',
-  '.CCCCCWCCCCC.',
-  '.CCCCCCCCCCC.',
-  '..CCCCCCCCC..',
-  '...KKKKKKK...',
-  '..KKKKKKKKK..',
-  '..KKKKKKKKK..',
-  '...K.....K...',
-  '..FFF...FFF..',
-  '..FFF...FFF..',
+  '.....HHH.....', //  0 hair top
+  '...HHHHHHH...', //  1 hair
+  '..HHHhhhHHH..', //  2 hair + highlight
+  '..HHhhhhhHH..', //  3 hair + highlight
+  '.HHHHHHHHHHH.', //  4 hair frames the face
+  '.HHSSSSSSSHH.', //  5 forehead
+  '.HSSSSSSSSSH.', //  6 face
+  '.HSGGGSGGGSH.', //  7 round lens rims
+  '.HSgggSgggSH.', //  8 bright lenses + nose bridge
+  '.HSSSSSSSSSH.', //  9 cheeks
+  '..SSSMMMSSS..', // 10 little smile
+  '...SSSSSSS...', // 11 chin
+  '....SSSSS....', // 12 neck
+  '..cCCCCCCCc..', // 13 cardigan collar
+  '.cCCCCWCCCCc.', // 14 cardigan + button
+  '.cCCCCWCCCCc.', // 15 cardigan + button
+  '.cCCCCWCCCCc.', // 16 cardigan + button
+  '.cCCCCWCCCCc.', // 17 cardigan + button
+  '..CCCCCCCCC..', // 18 hem
+  '..KKKKKKKKK..', // 19 skirt
+  '..KKKKKKKKK..', // 20 skirt
+  '...FF...FF...', // 21 shoes
 ];
 const GMA_PAL = {
   H: '#7a5230', // brown hair
+  h: '#9a6a3d', // hair highlight
   S: '#e8b98f', // skin
-  G: '#2b2533', // glasses frame
+  G: '#403a4a', // glasses frame
   g: '#cfe8f5', // glasses lens shine
+  M: '#bd6f66', // little smile
   C: '#d98fb0', // cardigan
+  c: '#b06a8a', // cardigan shading / collar
   W: '#fff0d0', // buttons
   K: '#5b6b8c', // skirt
   F: '#3a3550', // shoes
@@ -251,22 +266,35 @@ export function explosion(ctx, r, p, parts = []) {
   const fade = Math.max(0, 1 - p);
   const px = Math.max(2, Math.round(r / 7));
 
-  // a quick bright core: white → yellow → orange diamond, shrinking
-  if (p < 0.5) {
-    const k = 1 - p / 0.5;
+  // expanding shockwave ring — grows past the cat and fades early
+  if (p < 0.55) {
+    const k = p / 0.55;
+    ctx.save();
+    ctx.globalAlpha = (1 - k) * 0.8;
+    ctx.strokeStyle = p < 0.3 ? '#fff2c0' : '#ff9a3d';
+    ctx.lineWidth = Math.max(3, px * (1.6 - k));
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.3 + k * 1.05), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // a big bright core: white → yellow → orange diamond, shrinking
+  if (p < 0.55) {
+    const k = 1 - p / 0.55;
     const col = p < 0.16 ? '#ffffff' : p < 0.33 ? '#ffe14d' : '#ff8a3d';
-    const s = Math.max(px, Math.round(r * (0.5 + p) * 0.7));
+    const s = Math.max(px, Math.round(r * (0.7 + p) * 0.9));
     ctx.save();
     ctx.fillStyle = col;
     // chunky plus/diamond shape
-    ctx.fillRect(-s, -Math.round(s * 0.4 * k) - px, s * 2, Math.round(s * 0.8 * k) + px * 2);
-    ctx.fillRect(-Math.round(s * 0.4 * k) - px, -s, Math.round(s * 0.8 * k) + px * 2, s * 2);
+    ctx.fillRect(-s, -Math.round(s * 0.45 * k) - px, s * 2, Math.round(s * 0.9 * k) + px * 2);
+    ctx.fillRect(-Math.round(s * 0.45 * k) - px, -s, Math.round(s * 0.9 * k) + px * 2, s * 2);
     ctx.restore();
   }
 
   // shards (sparks + fur tufts) flying outward and drifting up
   for (const d of parts) {
-    const dist = (0.25 + p * 1.25) * r * d.sp;
+    const dist = (0.25 + p * 1.4) * r * d.sp;
     const x = Math.cos(d.a) * dist;
     const y = Math.sin(d.a) * dist - p * r * 0.55;
     ctx.globalAlpha = fade;

@@ -39,17 +39,19 @@ export const ZONES = [
 export const LEVEL_UP_EVERY = 5;   // cats fed per level
 
 export const DIFFICULTY = {
-  // Seconds between spawns: starts gentle, ramps to frantic.
+  // Seconds between spawns: starts gentle, ramps to frantic — and ramps faster
+  // now (steeper per-level drop + lower floor) so cats arrive thick and fast.
   spawnInterval(level) {
-    return Math.max(2.0, 4.4 - level * 0.28);
+    return Math.max(1.3, 3.8 - level * 0.42);
   },
-  // Seconds of patience a new cat has before exploding.
+  // Seconds of patience a new cat has before exploding. Shorter + a steeper
+  // drop than before, so the hunger ring drains noticeably faster.
   patience(level) {
-    return Math.max(9, 20 - level * 0.9);
+    return Math.max(7, 14 - level * 1.0);
   },
-  // Max cats on screen at once.
+  // Max cats on screen at once — fills the yard sooner.
   maxCats(level) {
-    return Math.min(ZONES.length, 1 + Math.floor(level / 2));
+    return Math.min(ZONES.length, 1 + Math.floor(level / 1.3));
   },
 };
 
@@ -62,11 +64,11 @@ export const SCORE = {
 };
 
 // --- Feel ------------------------------------------------------------------
-// The explosion is deliberately LOCAL now — a little stick-of-dynamite pop
-// right on the cat, no whole-screen shake or flash (those overwhelmed the
-// scene and could stutter on phones). Keep these at 0 unless you want drama.
+// Explosions are BIG now: a real boom on the cat plus a screen-wide kick and a
+// short flash. Kept tasteful (not cranked) so phones don't stutter — dial these
+// down toward 0 if you ever want the quieter, contained pop back.
 export const FEEL = {
-  explosionShake: 0,        // screen shake magnitude on explosion (px)
-  explosionFlashMs: 0,      // full-screen flash on explosion (ms)
+  explosionShake: 14,       // screen shake magnitude on explosion (px)
+  explosionFlashMs: 130,    // full-screen flash on explosion (ms)
   wrongFlashMs: 400,        // how long the local red "✗" shows on a mis-tap (ms)
 };

@@ -40,16 +40,16 @@ resize();
 // --- hooks: how entities reach audio + effects + game-over -----------------
 const hooks = {
   spawnExplosion(zoneId) {
-    // pre-generate a little flying debris so each pop varies (kept small)
+    // pre-generate flying debris so each blast varies — more shards = bigger boom
     const parts = [];
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 22; i++) {
       parts.push({
         a: Math.random() * Math.PI * 2,
-        sp: 0.7 + Math.random() * 1.4,
+        sp: 0.7 + Math.random() * 1.7,
         kind: Math.random() < 0.55 ? 'spark' : 'fur',
       });
     }
-    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.6, parts });
+    state.effects.push({ type: 'explosion', zoneId, t: 0, life: 0.85, parts });
   },
   spawnHearts(zoneId, points) {
     state.effects.push({ type: 'hearts', zoneId, points, t: 0, life: 1.0 });
